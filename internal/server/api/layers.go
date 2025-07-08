@@ -254,3 +254,27 @@ func (a *API) LayersEventsHandler(c echo.Context) error {
 		}
 	}
 }
+
+func (a *API) GetPlanHandler(c echo.Context) error {
+	namespace := c.Param("namespace")
+	layer := c.Param("layer")
+	run := c.Param("run")
+	attempt := c.Param("attempt")
+
+	if namespace == "" || layer == "" || run == "" || attempt == "" {
+		return c.String(http.StatusBadRequest, "Missing required parameters: namespace, layer, run, attempt")
+	}
+
+	planData, err := a.Datastore.GetPlan(namespace, layer, run, attempt, "pretty")
+	if err != nil {
+		log.Errorf("could not get plan for %s/%s/%s/%s: %s", namespace, layer, run, attempt, err)
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("could not get plan: %s", err))
+	}
+
+	if planData == nil {
+		return c.String(http.StatusNotFound, "Plan not found")
+	}
+
+	c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
+	return c.String(http.StatusOK, string(planData))
+}

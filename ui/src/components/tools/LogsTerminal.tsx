@@ -5,6 +5,7 @@ import { Tooltip } from 'react-tooltip';
 
 import { fetchAttempts } from '@/clients/runs/client';
 import { fetchLogs } from '@/clients/logs/client';
+import { fetchPlan } from '@/clients/plans/client';
 import { reactQueryKeys } from '@/clients/reactQueryConfig';
 
 import AttemptsDropdown from '@/components/dropdowns/AttemptsDropdown';
@@ -26,7 +27,7 @@ export interface LogsTerminalProps {
 const LogsTerminal: React.FC<LogsTerminalProps> = ({
   className,
   variant = 'light',
-  layer: { namespace, name },
+  layer: { namespace, name, latestRuns },
   run
 }) => {
   const styles = {
@@ -40,8 +41,14 @@ const LogsTerminal: React.FC<LogsTerminalProps> = ({
       border-nuances-black`
   };
 
+  // Check if the current run is an apply operation
+  const isApplyRun = latestRuns.find((r) => r.id === run)?.action === 'apply';
+
   const [selectedAttempts, setSelectedAttempts] = useState<number[]>([]);
   const [activeAttempt, setActiveAttempt] = useState<number | null>(null);
+  const [displayMode, setDisplayMode] = useState<'logs' | 'plan'>(
+    isApplyRun ? 'logs' : 'plan'
+  );
   /* TODO: The states above should eventually be moved to search params.
   An unresolved bug in the useSearchParams hook is causing rerenders which
   triggers the useEffect and resets the selectedAttempts and activeAttempt states. */
@@ -56,7 +63,19 @@ const LogsTerminal: React.FC<LogsTerminalProps> = ({
   const logsQuery = useQuery({
     queryKey: reactQueryKeys.logs(namespace, name, run, activeAttempt),
     queryFn: () => fetchLogs(namespace, name, run, activeAttempt),
-    enabled: activeAttempt !== null && !attemptsQuery.isFetching
+    enabled:
+      activeAttempt !== null &&
+      !attemptsQuery.isFetching &&
+      displayMode === 'logs'
+  });
+
+  const planQuery = useQuery({
+    queryKey: reactQueryKeys.plans(namespace, name, run, activeAttempt),
+    queryFn: () => fetchPlan(namespace, name, run, activeAttempt),
+    enabled:
+      activeAttempt !== null &&
+      !attemptsQuery.isFetching &&
+      displayMode === 'plan'
   });
 
   useEffect(() => {
@@ -70,8 +89,11 @@ const LogsTerminal: React.FC<LogsTerminalProps> = ({
   }, [attemptsQuery.data]);
 
   const handleCopy = () => {
-    if (logsQuery.isSuccess) {
-      navigator.clipboard.writeText(logsQuery.data.results.join('')); // TODO: check if this works properly
+    if (displayMode === 'logs' && logsQuery.isSuccess) {
+      navigator.clipboard.writeText(logsQuery.data.results.join(''));
+      setDisplayLogsCopiedTooltip(true);
+    } else if (displayMode === 'plan' && planQuery.isSuccess) {
+      navigator.clipboard.writeText(planQuery.data);
       setDisplayLogsCopiedTooltip(true);
     }
   };
@@ -111,14 +133,60 @@ const LogsTerminal: React.FC<LogsTerminalProps> = ({
           />
         </div>
         <div className="flex flex-row items-center gap-4">
+          {!isApplyRun && (
+            <div className="flex flex-row items-center gap-2">
+              <button
+                type="button"
+                className={`
+                  px-3 py-1 rounded-md text-sm font-medium
+                  ${
+                    displayMode === 'logs'
+                      ? variant === 'light'
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-nuances-50 text-nuances-400'
+                      : variant === 'light'
+                        ? 'bg-nuances-200 text-nuances-600'
+                        : 'bg-nuances-300 text-nuances-100'
+                  }
+                `}
+                onClick={() => setDisplayMode('logs')}
+              >
+                Logs
+              </button>
+              <button
+                type="button"
+                className={`
+                  px-3 py-1 rounded-md text-sm font-medium
+                  ${
+                    displayMode === 'plan'
+                      ? variant === 'light'
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-nuances-50 text-nuances-400'
+                      : variant === 'light'
+                        ? 'bg-nuances-200 text-nuances-600'
+                        : 'bg-nuances-300 text-nuances-100'
+                  }
+                `}
+                onClick={() => setDisplayMode('plan')}
+              >
+                Plan
+              </button>
+            </div>
+          )}
           <SyncIcon
             className={`
               cursor-pointer
-              ${logsQuery.isRefetching && 'animate-spin-slow'}
+              ${(logsQuery.isRefetching || planQuery.isRefetching) && 'animate-spin-slow'}
             `}
             height={30}
             width={30}
-            onClick={() => logsQuery.refetch()}
+            onClick={() => {
+              if (isApplyRun || displayMode === 'logs') {
+                logsQuery.refetch();
+              } else {
+                planQuery.refetch();
+              }
+            }}
           />
           <div
             data-tooltip-id={'terminal-tooltip'}
@@ -161,30 +229,42 @@ const LogsTerminal: React.FC<LogsTerminalProps> = ({
           ))}
       </div>
       <div className="pb-4 overflow-auto">
-        <table>
-          <tbody>
-            {activeAttempt !== null &&
-              logsQuery.isSuccess &&
-              logsQuery.data.results.map((log, i) => (
-                <tr key={i}>
-                  <td
-                    className={`
-                      text-sm
-                      px-4
-                      ${
-                        variant === 'light'
-                          ? 'text-primary-600'
-                          : 'text-nuances-300'
-                      }
-                    `}
-                  >
-                    {i + 1}
-                  </td>
-                  <td>{log}</td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
+        {displayMode === 'logs' && (
+          <table className="whitespace-pre-wrap">
+            <tbody>
+              {activeAttempt !== null &&
+                logsQuery.isSuccess &&
+                logsQuery.data.results.map((log, i) => (
+                  <tr key={i}>
+                    <td
+                      className={`text-sm px-4 ${variant === 'light' ? 'text-primary-600' : 'text-nuances-300'}`}
+                    >
+                      {i + 1}
+                    </td>
+                    <td>{log}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        )}
+        {displayMode === 'plan' && (
+          <div className="px-4">
+            {activeAttempt !== null && planQuery.isSuccess && (
+              <pre className="whitespace-pre-wrap font-mono text-sm">
+                {planQuery.data}
+              </pre>
+            )}
+            {activeAttempt !== null && planQuery.isError && (
+              <div className="text-red-500 text-sm">
+                Error loading plan:{' '}
+                {planQuery.error?.message || 'Unknown error'}
+              </div>
+            )}
+            {activeAttempt !== null && planQuery.isLoading && (
+              <div className="text-sm opacity-75">Loading plan...</div>
+            )}
+          </div>
+        )}
       </div>
       <Tooltip
         id="terminal-tooltip"

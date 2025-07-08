@@ -13,5 +13,11 @@ export const reactQueryKeys = {
     layer: string,
     runId: string,
     attemptId: number | null
-  ) => ['logs', namespace, layer, runId, attemptId]
+  ) => ['logs', namespace, layer, runId, attemptId],
+  plans: (
+    namespace: string,
+    layer: string,
+    runId: string,
+    attemptId: number | null
+  ) => ['plans', namespace, layer, runId, attemptId]
 };

@@ -108,6 +108,7 @@ func (s *Server) Exec() {
 	api.POST("/layers/:namespace/:layer/apply", s.API.ApplyLayerHandler)
 	api.GET("/repositories", s.API.RepositoriesHandler)
 	api.GET("/logs/:namespace/:layer/:run/:attempt", s.API.GetLogsHandler)
+	api.GET("/plan/:namespace/:layer/:run/:attempt", s.API.GetPlanHandler)
 	api.GET("/run/:namespace/:layer/:run/attempts", s.API.GetAttemptsHandler)
 
 	// start a goroutine to refresh webhook handlers every minute

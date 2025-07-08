@@ -1,9 +1,8 @@
 import React, { useState, useContext, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 
-import { fetchLayers, syncLayer } from '@/clients/layers/client';
-import { reactQueryKeys } from '@/clients/reactQueryConfig';
+import { syncLayer } from '@/clients/layers/client';
+import { useLayersEvents } from '@/hooks/useLayersEvents';
 
 import { ThemeContext } from '@/contexts/ThemeContext';
 
@@ -88,31 +87,66 @@ const Layers: React.FC = () => {
 
   const [showRefreshPane, setShowRefreshPane] = useState(false);
 
-  const layersQuery = useQuery({
-    queryKey: reactQueryKeys.layers,
-    queryFn: fetchLayers,
-    select: (data) => ({
-      ...data,
-      results: data.results
-        .filter((layer) =>
-          layer.name.toLowerCase().includes(search.toLowerCase())
-        )
-        .filter(
-          (layer) =>
-            stateFilter.length === 0 || stateFilter.includes(layer.state)
-        )
-        .filter(
-          (layer) =>
-            repositoryFilter.length === 0 ||
-            repositoryFilter.includes(layer.repository)
-        )
-        .filter((layer) => !hidePRFilter || !layer.isPR)
-    })
-  });
+  const {
+    layers: layersData,
+    connectionStatus,
+    isLoading,
+    reconnect
+  } = useLayersEvents();
+
+  const layersQuery = useMemo(() => {
+    const hasError = connectionStatus === 'error';
+
+    if (!layersData) {
+      return {
+        isLoading,
+        isSuccess: false,
+        isError: hasError,
+        isRefetching: false,
+        data: { results: [] },
+        refetch: reconnect
+      };
+    }
+
+    const filteredResults = layersData.results
+      .filter((layer) =>
+        layer.name.toLowerCase().includes(search.toLowerCase())
+      )
+      .filter(
+        (layer) => stateFilter.length === 0 || stateFilter.includes(layer.state)
+      )
+      .filter(
+        (layer) =>
+          repositoryFilter.length === 0 ||
+          repositoryFilter.includes(layer.repository)
+      )
+      .filter((layer) => !hidePRFilter || !layer.isPR);
+
+    return {
+      isLoading: false,
+      isSuccess: true,
+      isError: false,
+      isRefetching: false,
+      data: {
+        ...layersData,
+        results: filteredResults
+      },
+      refetch: reconnect
+    };
+  }, [
+    layersData,
+    search,
+    stateFilter,
+    repositoryFilter,
+    hidePRFilter,
+    isLoading,
+    reconnect,
+    connectionStatus
+  ]);
 
   const updateLimit = useCallback(
     (limit: number) => {
-      if (layersQuery.isSuccess) {
+      if (layersQuery.isSuccess && layersQuery.data) {
         if (layerOffset + limit > layersQuery.data.results.length) {
           setLayerOffset(Math.max(0, layersQuery.data.results.length - limit));
         }
@@ -411,8 +445,8 @@ const Layers: React.FC = () => {
               layersQuery.data.results.length > 0 ? (
                 layersQuery.data.results
                   .slice(layerOffset, layerOffset + layerLimit)
-                  .map((layer, index) => (
-                    <Card key={index} variant={theme} layer={layer} />
+                  .map((layer) => (
+                    <Card key={layer.uid} variant={theme} layer={layer} />
                   ))
               ) : (
                 <span

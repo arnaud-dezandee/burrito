@@ -65,6 +65,24 @@ func (s *Server) Exec() {
 	s.client = *client
 	s.API.Client = s.client
 	s.Webhook.Client = s.client
+
+	// Initialize watch manager
+	restConfig := ctrl.GetConfigOrDie()
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(configv1alpha1.AddToScheme(scheme))
+	watchManager := api.NewWatchManager(s.client, restConfig, scheme, s.API)
+	s.API.SetWatchManager(watchManager)
+
+	// Start watch manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		if err := watchManager.Start(ctx); err != nil {
+			log.Fatalf("failed to start watch manager: %s", err)
+		}
+	}()
+
 	log.Info("initializing webhook handlers...")
 	err = s.Webhook.Init()
 	if err != nil {
@@ -85,6 +103,7 @@ func (s *Server) Exec() {
 	e.GET("/healthz", handleHealthz)
 	api.POST("/webhook", s.Webhook.GetHttpHandler())
 	api.GET("/layers", s.API.LayersHandler)
+	api.GET("/layers/events", s.API.LayersEventsHandler)
 	api.POST("/layers/:namespace/:layer/sync", s.API.SyncLayerHandler)
 	api.POST("/layers/:namespace/:layer/apply", s.API.ApplyLayerHandler)
 	api.GET("/repositories", s.API.RepositoriesHandler)
@@ -92,8 +111,6 @@ func (s *Server) Exec() {
 	api.GET("/run/:namespace/:layer/:run/attempts", s.API.GetAttemptsHandler)
 
 	// start a goroutine to refresh webhook handlers every minute
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	go s.refreshWebhookHandlers(ctx)
 
 	e.Logger.Fatal(e.Start(s.config.Server.Addr))

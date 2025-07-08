@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -74,16 +75,9 @@ func (a *API) getLayersAndRuns() ([]configv1alpha1.TerraformLayer, map[string]co
 	return layers.Items, indexedRuns, indexedRepositories, err
 }
 
-func (a *API) LayersHandler(c echo.Context) error {
-	layers, runs, repositories, err := a.getLayersAndRuns()
-	if err != nil {
-		return c.String(http.StatusInternalServerError, fmt.Sprintf("could not list terraform layers or runs: %s", err))
-	}
+func (a *API) buildLayersResponse(layersData []configv1alpha1.TerraformLayer, runs map[string]configv1alpha1.TerraformRun, repositories map[string]configv1alpha1.TerraformRepository) []layer {
 	results := []layer{}
-	for _, l := range layers {
-		if err != nil {
-			log.Errorf("could not get latest run for layer %s: %s", l.Name, err)
-		}
+	for _, l := range layersData {
 		run, ok := runs[fmt.Sprintf("%s/%s", l.Namespace, l.Status.LastRun.Name)]
 		runAPI := Run{}
 		running := false
@@ -125,10 +119,20 @@ func (a *API) LayersHandler(c echo.Context) error {
 			AutoApply:        autoApply,
 		})
 	}
+	return results
+}
+
+func (a *API) LayersHandler(c echo.Context) error {
+	layers, runs, repositories, err := a.getLayersAndRuns()
+	if err != nil {
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("could not list terraform layers or runs: %s", err))
+	}
+
+	results := a.buildLayersResponse(layers, runs, repositories)
+
 	return c.JSON(http.StatusOK, &layersResponse{
 		Results: results,
-	},
-	)
+	})
 }
 
 func runStillRunning(run configv1alpha1.TerraformRun) bool {
@@ -195,4 +199,58 @@ func hasValidPlan(layer configv1alpha1.TerraformLayer) bool {
 	// This matches the logic in HasLastPlanFailed condition
 	planSum, exists := layer.Annotations[annotations.LastPlanSum]
 	return exists && planSum != ""
+}
+
+func (a *API) LayersEventsHandler(c echo.Context) error {
+	// Set headers for Server-Sent Events
+	c.Response().Header().Set("Content-Type", "text/event-stream")
+	c.Response().Header().Set("Cache-Control", "no-cache")
+	c.Response().Header().Set("Connection", "keep-alive")
+	c.Response().Header().Set("Access-Control-Allow-Origin", "*")
+	c.Response().Header().Set("Access-Control-Allow-Headers", "Cache-Control")
+
+	ctx := c.Request().Context()
+
+	// Create a channel for this client
+	clientChan := make(chan []byte, 10)
+	clientID := fmt.Sprintf("client-%d", time.Now().UnixNano())
+
+	// Subscribe to watch manager
+	if a.watchManager != nil {
+		a.watchManager.Subscribe(clientID, clientChan)
+		defer a.watchManager.Unsubscribe(clientID)
+	} else {
+		log.Error("Watch manager not initialized")
+		return c.String(http.StatusInternalServerError, "Watch manager not available")
+	}
+
+	// Send initial data
+	layersData, runs, repositories, err := a.getLayersAndRuns()
+	if err != nil {
+		log.Errorf("failed to get initial layers data: %s", err)
+		return c.String(http.StatusInternalServerError, "Failed to get layers data")
+	}
+
+	results := a.buildLayersResponse(layersData, runs, repositories)
+
+	initialData, err := json.Marshal(&layersResponse{Results: results})
+	if err != nil {
+		log.Errorf("failed to marshal initial data: %s", err)
+		return c.String(http.StatusInternalServerError, "Failed to marshal data")
+	}
+
+	fmt.Fprintf(c.Response(), "data: %s\n\n", initialData)
+	c.Response().Flush()
+
+	// Listen for updates
+	for {
+		select {
+		case data := <-clientChan:
+			fmt.Fprintf(c.Response(), "data: %s\n\n", data)
+			c.Response().Flush()
+		case <-ctx.Done():
+			log.Info("client disconnected")
+			return nil
+		}
+	}
 }

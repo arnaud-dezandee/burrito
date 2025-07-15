@@ -18,6 +18,7 @@ import CodeBranchIcon from '@/assets/icons/CodeBranchIcon';
 import SyncIcon from '@/assets/icons/SyncIcon';
 import PlayIcon from '@/assets/icons/PlayIcon';
 import GenericIconButton from '@/components/buttons/GenericIconButton';
+import ConfirmationModal from '@/components/modals/ConfirmationModal';
 
 import { Layer, LayerState } from '@/clients/layers/types';
 import { applyLayer, syncLayer } from '@/clients/layers/client';
@@ -37,10 +38,26 @@ const Table: React.FC<TableProps> = ({
 }) => {
   const columnHelper = createColumnHelper<Layer>();
   const [hoveredRow, setHoveredRow] = useState<Layer | null>(null);
+  const [showApplyConfirmation, setShowApplyConfirmation] = useState(false);
+  const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(
+    null
+  );
   const syncSelectedLayer = async (index: number) => {
     const sync = await syncLayer(data[index].namespace, data[index].name);
     if (sync.status === 200) {
       data[index].manualSyncStatus = 'pending';
+    }
+  };
+
+  const handleApplyClick = (index: number) => {
+    setSelectedLayerIndex(index);
+    setShowApplyConfirmation(true);
+  };
+
+  const handleApplyConfirm = () => {
+    if (selectedLayerIndex !== null) {
+      applySelectedLayer(selectedLayerIndex);
+      setSelectedLayerIndex(null);
     }
   };
 
@@ -143,11 +160,12 @@ const Table: React.FC<TableProps> = ({
                   result.row.original.isPR ||
                   result.row.original.manualSyncStatus !== 'none'
                 }
-                onClick={() => applySelectedLayer(result.row.index)}
+                onClick={() => handleApplyClick(result.row.index)}
                 tooltip={getApplyButtonTooltip(result.row.original)}
               />
             </div>
-          ) : result.row.original.isRunning ? (
+          ) : result.row.original.isRunning ||
+            result.row.original.manualSyncStatus !== 'none' ? (
             <div
               className={`
                 absolute
@@ -168,7 +186,7 @@ const Table: React.FC<TableProps> = ({
                 }
               `}
             >
-              <Running />
+              <Running action={result.row.original.lastRun?.action} />
             </div>
           ) : null}
         </div>
@@ -355,7 +373,8 @@ const Table: React.FC<TableProps> = ({
                   className={twMerge(
                     `h-full
                   ${styles.row.base[variant]}`,
-                    row.original.isRunning &&
+                    (row.original.isRunning ||
+                      row.original.manualSyncStatus !== 'none') &&
                       `rounded-2xl
                       outline
                       outline-4
@@ -376,13 +395,15 @@ const Table: React.FC<TableProps> = ({
                         font-semibold
                         px-6
                         py-4`,
-                        cell.row.original.isRunning &&
+                        (cell.row.original.isRunning ||
+                          cell.row.original.manualSyncStatus !== 'none') &&
                           'first:rounded-l-2xl last:rounded-r-2xl'
                       )}
                       data-tooltip-id="table-tooltip"
                       data-tooltip-content={
                         cell.column.id === 'lastResult' &&
-                        cell.row.original.isRunning
+                        (cell.row.original.isRunning ||
+                          cell.row.original.manualSyncStatus !== 'none')
                           ? (cell.getValue() as string)
                           : null
                       }
@@ -432,6 +453,16 @@ const Table: React.FC<TableProps> = ({
         opacity={1}
         id="table-tooltip"
         variant={variant === 'light' ? 'dark' : 'light'}
+      />
+      <ConfirmationModal
+        variant={variant}
+        isOpen={showApplyConfirmation}
+        onOpenChange={setShowApplyConfirmation}
+        title="Confirm Apply"
+        message={`Are you sure you want to apply changes to layey? This action will execute the Terraform plan and modify your infrastructure.`}
+        confirmText="Apply"
+        cancelText="Cancel"
+        onConfirm={handleApplyConfirm}
       />
     </div>
   );

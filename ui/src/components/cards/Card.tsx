@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Tooltip } from 'react-tooltip';
 
 import Running from '@/components/widgets/Running';
 import Tag from '@/components/widgets/Tag';
 import ModalLogsTerminal from '@/components/tools/ModalLogsTerminal';
+import ConfirmationModal from '@/components/modals/ConfirmationModal';
 import CodeBranchIcon from '@/assets/icons/CodeBranchIcon';
 import ChiliLight from '@/assets/illustrations/ChiliLight';
 import ChiliDark from '@/assets/illustrations/ChiliDark';
@@ -37,6 +38,7 @@ const Card: React.FC<CardProps> = ({
     isPR
   }
 }) => {
+  const [showApplyConfirmation, setShowApplyConfirmation] = useState(false);
   const styles = {
     base: {
       light: `bg-nuances-white
@@ -118,7 +120,8 @@ const Card: React.FC<CardProps> = ({
         p-6
         gap-4
         ${styles.base[variant]}`,
-        isRunning && `outline-solid outline-4 ${styles.isRunning[variant]}`,
+        (isRunning || isManualActionPending) &&
+          `outline-solid outline-4 ${styles.isRunning[variant]}`,
         className
       )}
     >
@@ -142,8 +145,8 @@ const Card: React.FC<CardProps> = ({
         >
           {name}
         </span>
-        {isRunning ? (
-          <Running />
+        {isRunning || isManualActionPending ? (
+          <Running action={layer.lastRun?.action} />
         ) : isPR ? (
           <CodeBranchIcon
             className={`
@@ -211,10 +214,20 @@ const Card: React.FC<CardProps> = ({
           variant={variant}
           Icon={PlayIcon}
           disabled={layer.isPR || isManualActionPending}
-          onClick={() => applySelectedLayer(layer)}
+          onClick={() => setShowApplyConfirmation(true)}
           tooltip={getApplyButtonTooltip()}
         />
       </div>
+      <ConfirmationModal
+        variant={variant}
+        isOpen={showApplyConfirmation}
+        onOpenChange={setShowApplyConfirmation}
+        title={`Confirm Apply`}
+        message={`Are you sure you want to apply changes to layer? This action will execute the Terraform plan and modify your infrastructure.`}
+        confirmText="Apply"
+        cancelText="Cancel"
+        onConfirm={() => applySelectedLayer(layer)}
+      />
       <Tooltip
         opacity={1}
         id="card-tooltip"

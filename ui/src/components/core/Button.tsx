@@ -154,7 +154,9 @@ const Button: React.FC<ButtonProps> = ({
         `relative
         px-4
         py-2
-        rounded-md`,
+        rounded-md
+        cursor-pointer`,
+        disabled && 'cursor-not-allowed',
         styles[theme].base[variant],
         disabled && styles[theme].disabled[variant],
         className

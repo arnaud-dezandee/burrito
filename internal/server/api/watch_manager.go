@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -34,6 +35,7 @@ type WatchManager struct {
 	debounceTimer *time.Timer
 	debounceMutex sync.Mutex
 	pendingUpdate bool
+	lastSentData  []byte // Store the last sent data to compare against
 }
 
 func NewWatchManager(client client.Client, restConfig *rest.Config, scheme *runtime.Scheme, api *API) *WatchManager {
@@ -245,5 +247,16 @@ func (wm *WatchManager) sendLayersUpdate() {
 		return
 	}
 
+	// Compare with last sent data to avoid sending identical updates
+	if wm.lastSentData != nil && bytes.Equal(data, wm.lastSentData) {
+		log.Debug("Skipping identical layers update")
+		return
+	}
+
+	// Store the current data as last sent
+	wm.lastSentData = make([]byte, len(data))
+	copy(wm.lastSentData, data)
+
+	log.Debug("Broadcasting layers update to subscribers")
 	wm.broadcast(data)
 }

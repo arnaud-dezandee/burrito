@@ -20,7 +20,7 @@ type State interface {
 	getHandler() Handler
 }
 
-func (r *Reconciler) GetState(ctx context.Context, layer *configv1alpha1.TerraformLayer) (State, []metav1.Condition) {
+func (r *Reconciler) GetState(ctx context.Context, layer *configv1alpha1.TerraformLayer, repo *configv1alpha1.TerraformRepository) (State, []metav1.Condition) {
 	log := log.WithContext(ctx)
 	c1, IsRunning := r.IsRunning(layer)
 	c2, IsLastPlanTooOld := r.IsLastPlanTooOld(layer)
@@ -28,20 +28,26 @@ func (r *Reconciler) GetState(ctx context.Context, layer *configv1alpha1.Terrafo
 	c4, HasLastPlanFailed := r.HasLastPlanFailed(layer)
 	c5, IsApplyUpToDate := r.IsApplyUpToDate(layer)
 	c6, IsSyncScheduled := r.IsSyncScheduled(layer)
-	conditions := []metav1.Condition{c1, c2, c3, c4, c5, c6}
+	c7, retryInfo := r.HasLastRunReachedRetryLimit(layer, repo)
+	conditions := []metav1.Condition{c1, c2, c3, c4, c5, c6, c7}
+	LastPlanExhausted := retryInfo.reachedLimit && retryInfo.action == string(PlanAction)
+	LastApplyExhausted := retryInfo.reachedLimit && retryInfo.action == string(ApplyAction)
 	switch {
 	case IsRunning:
 		log.Infof("layer %s is running, waiting for the run to finish", layer.Name)
 		return &Idle{}, conditions
-	case IsLastPlanTooOld || !IsLastRelevantCommitPlanned:
-		log.Infof("layer %s has an outdated plan, creating a new run", layer.Name)
-		return &PlanNeeded{}, conditions
 	case IsSyncScheduled:
 		log.Infof("layer %s has a sync scheduled, creating a new run", layer.Name)
 		return &PlanNeeded{}, conditions
-	case !IsApplyUpToDate && !HasLastPlanFailed:
+	case (IsLastPlanTooOld || !IsLastRelevantCommitPlanned) && !LastPlanExhausted:
+		log.Infof("layer %s has an outdated plan, creating a new run", layer.Name)
+		return &PlanNeeded{}, conditions
+	case !IsApplyUpToDate && !HasLastPlanFailed && !LastApplyExhausted:
 		log.Infof("layer %s needs to be applied, creating a new run", layer.Name)
 		return &ApplyNeeded{}, conditions
+	case LastPlanExhausted || LastApplyExhausted:
+		log.Infof("layer %s has reached max retries for %s action, requires manual intervention", layer.Name, retryInfo.action)
+		return &MaxRetriesReached{}, conditions
 	default:
 		log.Infof("layer %s is in an unknown state, defaulting to idle. If this happens please file an issue, this is not an intended behavior.", layer.Name)
 		return &Idle{}, conditions
@@ -112,6 +118,17 @@ func (s *ApplyNeeded) getHandler() Handler {
 		}
 		r.Recorder.Event(layer, corev1.EventTypeNormal, "Reconciliation", "Created TerraformRun for Apply action")
 		return ctrl.Result{RequeueAfter: r.Config.Controller.Timers.WaitAction}, &run
+	}
+}
+
+type MaxRetriesReached struct{}
+
+func (s *MaxRetriesReached) getHandler() Handler {
+	return func(ctx context.Context, r *Reconciler, layer *configv1alpha1.TerraformLayer, repository *configv1alpha1.TerraformRepository) (ctrl.Result, *configv1alpha1.TerraformRun) {
+		// Layer has reached max retries and requires manual intervention
+		// Requeue with a longer interval since frequent checks won't help
+		r.Recorder.Event(layer, corev1.EventTypeWarning, "Reconciliation", "Layer has reached max retries for Plan or Apply action, check the status and logs of the last run")
+		return ctrl.Result{RequeueAfter: r.Config.Controller.Timers.DriftDetection}, nil
 	}
 }
 

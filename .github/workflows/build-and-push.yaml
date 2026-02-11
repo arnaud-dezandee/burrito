@@ -10,7 +10,38 @@ permissions:
   packages: write
 
 jobs:
+  build-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: ui/yarn.lock
+
+      - name: Install dependencies
+        working-directory: ui
+        run: yarn install --frozen-lockfile
+
+      - name: Build UI
+        working-directory: ui
+        run: yarn build
+        env:
+          VITE_API_BASE_URL: /api
+
+      - name: Upload UI artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: ui-dist
+          path: ui/dist
+          retention-days: 1
+
   build:
+    needs: build-ui
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       fail-fast: false
@@ -61,18 +92,27 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download UI artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: ui-dist
+          path: .pre-built-ui/workspace/dist
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v6
         with:
+          context: .
           platforms: ${{ matrix.platform.name }}
+          build-contexts: |
+            builder-ui=.pre-built-ui
           build-args: |
             VERSION=${{ env.VERSION }}
             BUILD_TIMESTAMP=${{ env.BUILD_TIMESTAMP }}
             COMMIT_HASH=${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=build-${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,scope=build-${{ env.PLATFORM_PAIR }},mode=max
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest

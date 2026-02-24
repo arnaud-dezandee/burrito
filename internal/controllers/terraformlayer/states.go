@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	configv1alpha1 "github.com/padok-team/burrito/api/v1alpha1"
 	"github.com/padok-team/burrito/internal/annotations"
@@ -77,6 +78,9 @@ func (s *PlanNeeded) getHandler() Handler {
 			log.Errorf("layer %s has no last relevant commit annotation, run not created", layer.Name)
 			return ctrl.Result{RequeueAfter: r.Config.Controller.Timers.OnError}, nil
 		}
+		if requeue, result := r.checkBundleExists(ctx, layer, repository, revision); requeue {
+			return result, nil
+		}
 		run := r.getRun(layer, revision, PlanAction)
 		err := r.Client.Create(ctx, &run)
 		if err != nil {
@@ -109,6 +113,9 @@ func (s *ApplyNeeded) getHandler() Handler {
 			log.Errorf("layer %s has no last relevant commit annotation, run not created", layer.Name)
 			return ctrl.Result{RequeueAfter: r.Config.Controller.Timers.OnError}, nil
 		}
+		if requeue, result := r.checkBundleExists(ctx, layer, repository, revision); requeue {
+			return result, nil
+		}
 		run := r.getRun(layer, revision, ApplyAction)
 		err := r.Client.Create(ctx, &run)
 		if err != nil {
@@ -135,6 +142,31 @@ func (s *MaxRetriesReached) getHandler() Handler {
 func getStateString(state State) string {
 	t := strings.Split(fmt.Sprintf("%T", state), ".")
 	return t[len(t)-1]
+}
+
+// checkBundleExists verifies that the git bundle for the current branch + revision exists in the datastore.
+// If the bundle is missing (e.g. because the layer's branch was changed but the repository controller
+// hasn't synced the new branch yet), it triggers a repository sync and returns true to signal the caller
+// should requeue without creating a run.
+func (r *Reconciler) checkBundleExists(ctx context.Context, layer *configv1alpha1.TerraformLayer, repository *configv1alpha1.TerraformRepository, revision string) (bool, ctrl.Result) {
+	bundleExists, err := r.Datastore.CheckGitBundle(layer.Spec.Repository.Namespace, layer.Spec.Repository.Name, layer.Spec.Branch, revision)
+	if err != nil {
+		r.Recorder.Event(layer, corev1.EventTypeWarning, "Reconciliation", "Failed to check git bundle in datastore")
+		log.Errorf("failed to check git bundle for layer %s: %s", layer.Name, err)
+		return true, ctrl.Result{RequeueAfter: r.Config.Controller.Timers.OnError}
+	}
+	if !bundleExists {
+		log.Infof("bundle for revision %s on branch %s not found for layer %s, triggering repository sync", revision, layer.Spec.Branch, layer.Name)
+		r.Recorder.Event(layer, corev1.EventTypeNormal, "Reconciliation", fmt.Sprintf("Waiting for repository to sync branch %s", layer.Spec.Branch))
+		err = annotations.Add(ctx, r.Client, repository, map[string]string{
+			annotations.ComputeKeyForSyncBranchNow(layer.Spec.Branch): r.Clock.Now().Format(time.UnixDate),
+		})
+		if err != nil {
+			log.Errorf("failed to trigger repository sync for layer %s: %s", layer.Name, err)
+		}
+		return true, ctrl.Result{RequeueAfter: r.Config.Controller.Timers.WaitAction}
+	}
+	return false, ctrl.Result{}
 }
 
 func isActionBlocked(r *Reconciler, layer *configv1alpha1.TerraformLayer, repository *configv1alpha1.TerraformRepository, action syncwindow.Action) bool {

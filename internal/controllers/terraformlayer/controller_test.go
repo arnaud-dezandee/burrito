@@ -85,11 +85,22 @@ var _ = BeforeSuite(func() {
 		}),
 		Scheme:    scheme.Scheme,
 		Config:    config.TestConfig(),
-		Datastore: datastore.NewMockClient(),
+		Datastore: newSeededMockClient(),
 	}
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 })
+
+// newSeededMockClient creates a mock datastore client pre-seeded with git bundles
+// for the test repo on the main branch with all revisions used in layer test data.
+// This ensures CheckGitBundle returns true for valid (repo, main, revision) combos
+// and false for other branches (e.g. develop) or unknown revisions.
+func newSeededMockClient() *datastore.MockClient {
+	mock := datastore.NewMockClient()
+	mock.PutGitBundle("default", "burrito", "main", "cb9f15b90861c8c4364cdde63d17837c7a9ccca9", []byte("test"))
+	mock.PutGitBundle("default", "burrito", "main", "f4f5c237f34bac134e4503c40de9d142c1e04077", []byte("test"))
+	return mock
+}
 
 func getReconcilerWithConfig(config *config.Config) *controller.Reconciler {
 	return &controller.Reconciler{
@@ -100,7 +111,7 @@ func getReconcilerWithConfig(config *config.Config) *controller.Reconciler {
 		}),
 		Scheme:    scheme.Scheme,
 		Config:    config,
-		Datastore: datastore.NewMockClient(),
+		Datastore: newSeededMockClient(),
 	}
 }
 
@@ -676,6 +687,44 @@ var _ = Describe("Layer", func() {
 				runs, err := getLinkedRuns(k8sClient, layer)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(runs.Items)).To(Equal(0))
+			})
+		})
+	})
+	Describe("Branch change cases", func() {
+		Describe("When a TerraformLayer branch was changed and sync requested but bundle does not exist yet", Ordered, func() {
+			BeforeAll(func() {
+				name = types.NamespacedName{
+					Name:      "error-case-10",
+					Namespace: "default",
+				}
+				result, layer, reconcileError, err = getResult(name, reconciler)
+			})
+			It("should still exist", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("should not return an error", func() {
+				Expect(reconcileError).NotTo(HaveOccurred())
+			})
+			It("should end in PlanNeeded state", func() {
+				Expect(layer.Status.State).To(Equal("PlanNeeded"))
+			})
+			It("should set RequeueAfter to WaitAction", func() {
+				Expect(result.RequeueAfter).To(Equal(reconciler.Config.Controller.Timers.WaitAction))
+			})
+			It("should not have created any TerraformRun", func() {
+				runs, err := getLinkedRuns(k8sClient, layer)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(runs.Items)).To(Equal(0))
+			})
+			It("should have triggered a repository sync for the new branch", func() {
+				repo := &configv1alpha1.TerraformRepository{}
+				err := k8sClient.Get(context.TODO(), types.NamespacedName{
+					Name:      "burrito",
+					Namespace: "default",
+				}, repo)
+				Expect(err).NotTo(HaveOccurred())
+				syncKey := "webhook.terraform.padok.cloud/sync-develop"
+				Expect(repo.Annotations).To(HaveKey(syncKey))
 			})
 		})
 	})

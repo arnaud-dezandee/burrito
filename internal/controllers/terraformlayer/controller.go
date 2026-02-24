@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/padok-team/burrito/internal/annotations"
 	"github.com/padok-team/burrito/internal/burrito/config"
 	datastore "github.com/padok-team/burrito/internal/datastore/client"
 	"github.com/padok-team/burrito/internal/lock"
@@ -112,6 +113,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		r.Recorder.Event(layer, corev1.EventTypeWarning, "Reconciliation", err.Error())
 		return ctrl.Result{}, err
 	}
+	r.ensureBranchSynced(ctx, layer, repository)
 	state, conditions := r.GetState(ctx, layer, repository)
 	lastResult := []byte("Layer has never been planned")
 	if layer.Status.LastRun.Name != "" {
@@ -229,6 +231,23 @@ func ignorePredicate() predicate.Predicate {
 			// Evaluates to false if the object has been confirmed deleted.
 			return !e.DeleteStateUnknown
 		},
+	}
+}
+
+// ensureBranchSynced proactively triggers a repository sync if the layer's current branch
+// has not been synced yet. This handles the case where the layer's branch was changed but
+// the repository controller hasn't picked up the new branch.
+func (r *Reconciler) ensureBranchSynced(ctx context.Context, layer *configv1alpha1.TerraformLayer, repository *configv1alpha1.TerraformRepository) {
+	branch := layer.Spec.Branch
+	branchState, found := configv1alpha1.GetBranchState(branch, repository.Status.Branches)
+	if !found || branchState.LatestRev == "" {
+		log.Infof("branch %s for layer %s has not been synced yet, triggering repository sync", branch, layer.Name)
+		err := annotations.Add(ctx, r.Client, repository, map[string]string{
+			annotations.ComputeKeyForSyncBranchNow(branch): r.Clock.Now().Format(time.UnixDate),
+		})
+		if err != nil {
+			log.Errorf("failed to trigger repository sync for branch %s: %s", branch, err)
+		}
 	}
 }
 

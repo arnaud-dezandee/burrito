@@ -353,9 +353,14 @@ func LayerFilesHaveChanged(layer configv1alpha1.TerraformLayer, changedFiles []s
 		// Check if the file is under an additionnal trigger path
 		if val, ok := layer.Annotations[annotations.AdditionnalTriggerPaths]; ok {
 			for _, p := range strings.Split(val, ",") {
-				p = ensureAbsPath(p)
-				// Handle relative parent paths (like "../")
-				p = filepath.Clean(filepath.Join(layer.Spec.Path, p))
+				p = strings.TrimSpace(p)
+				if strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") {
+					// Dot-relative path: resolve from layer spec path
+					p = ensureAbsPath(filepath.Clean(filepath.Join(layer.Spec.Path, p)))
+				} else {
+					// Plain path or absolute: match against repository root
+					p = ensureAbsPath(filepath.Clean(p))
+				}
 				if strings.Contains(f, p) {
 					return true
 				}

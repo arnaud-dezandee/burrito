@@ -6,6 +6,7 @@ Create ConfigMap in all tenant namespaces + release namespace
 {{- $namespaces = append $namespaces $tenant.namespace.name }}
 {{- end }}
 {{- $namespaces = append $namespaces .Release.Namespace }}
+{{- $namespaces = $namespaces | uniq }}
 
 {{- range $namespace := $namespaces }}
 ---

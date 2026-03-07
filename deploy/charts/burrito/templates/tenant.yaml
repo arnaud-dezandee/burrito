@@ -21,6 +21,20 @@ spec:
 ---
 {{- end }}
 apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: burrito-controllers
+  namespace: {{ $tenant.namespace.name }}
+  {{- with mergeOverwrite (deepCopy $metadataTenant) $metadataControllers }}
+  labels:
+    {{- toYaml .labels | nindent 4}}
+  annotations:
+    {{- toYaml .annotations | nindent 4}}
+  {{- end }}
+rules:
+{{- include "burrito.controllersRules" $ | nindent 0 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: burrito-controllers
@@ -33,7 +47,7 @@ metadata:
   {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: burrito-controllers
 subjects:
   - kind: ServiceAccount
@@ -53,6 +67,20 @@ metadata:
     {{- toYaml .annotations | nindent 4}}
   {{- end }}
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: burrito-runner
+  namespace: {{ $tenant.namespace.name }}
+  {{- with mergeOverwrite (deepCopy $metadataTenant) $metadataRbacRunners }}
+  labels:
+    {{- toYaml .labels | nindent 4}}
+  annotations:
+    {{- toYaml .annotations | nindent 4}}
+  {{- end }}
+rules:
+{{- include "burrito.runnerRules" $ | nindent 0 }}
+---
 # Role binding for the default service account
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -67,18 +95,17 @@ metadata:
   {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: burrito-runner
 subjects:
   - kind: ServiceAccount
     name: burrito-runner
     namespace: {{ $tenant.namespace.name }}
 ---
-# Role and RoleBinding for burrito-server to access this tenant's secrets (webhook secret)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: secret-access
+  name: burrito-server
   namespace: {{ $tenant.namespace.name }}
   {{- with mergeOverwrite (deepCopy $metadataTenant) $metadataServer }}
   labels:
@@ -87,14 +114,12 @@ metadata:
     {{- toYaml .annotations | nindent 4}}
   {{- end }}
 rules:
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list", "watch"]
+{{- include "burrito.serverRules" $ | nindent 0 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: burrito-server-secret-access
+  name: burrito-server
   namespace: {{ $tenant.namespace.name }}
   {{- with mergeOverwrite (deepCopy $metadataTenant) $metadataServer }}
   labels:
@@ -105,7 +130,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: secret-access
+  name: burrito-server
 subjects:
   - kind: ServiceAccount
     name: burrito-server
@@ -138,7 +163,7 @@ metadata:
   {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: burrito-runner
 subjects:
   - kind: ServiceAccount

@@ -1,0 +1,282 @@
+{{- define "burrito.controllersRules" -}}
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - list
+  - create
+  - update
+  - watch
+  - get
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformlayers
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformlayers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformlayers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformrepositories
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformrepositories/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformrepositories/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformpullrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformpullrequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformpullrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformruns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformruns/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformruns/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+{{- end -}}
+
+{{- define "burrito.runnerRules" -}}
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - delete
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformlayers
+  verbs:
+  - get
+  - patch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformruns
+  verbs:
+  - get
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformrepositories
+  verbs:
+  - get
+{{- end -}}
+
+{{- define "burrito.serverRules" -}}
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformlayers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformrepositories
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformlayers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformpullrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformpullrequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformpullrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformruns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformruns/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terraformruns/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - list
+  - create
+  - update
+  - watch
+  - get
+{{- end -}}

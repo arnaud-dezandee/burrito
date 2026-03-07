@@ -7,14 +7,46 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Creates a network mirror configuration file for Terraform with the given endpoint
+// providerCacheDir returns the filesystem path to use as a local provider cache,
+// detected from environment variables. Returns "" if no cache directory is configured.
+func providerCacheDir() string {
+	// TG_PROVIDER_CACHE_DIR is set by Terragrunt users to share providers across modules.
+	if dir := os.Getenv("TG_PROVIDER_CACHE_DIR"); dir != "" {
+		return dir
+	}
+	// TF_PLUGIN_CACHE_DIR is the standard OpenTofu/Terraform provider cache.
+	if dir := os.Getenv("TF_PLUGIN_CACHE_DIR"); dir != "" {
+		return dir
+	}
+	return ""
+}
+
+// CreateNetworkMirrorConfig creates a provider_installation configuration file that
+// routes provider downloads through the given network mirror endpoint (hermitcrab).
+//
+// When a local provider cache directory is detected (via TG_PROVIDER_CACHE_DIR or
+// TF_PLUGIN_CACHE_DIR), a filesystem_mirror block is prepended so that providers are
+// looked up from the local cache before hitting the network mirror. This is necessary
+// because an explicit provider_installation block causes both OpenTofu and Terraform to
+// ignore TF_PLUGIN_CACHE_DIR entirely — the filesystem_mirror is the only way to get
+// local caching alongside a network mirror.
 func CreateNetworkMirrorConfig(targetPath string, endpoint string) error {
+	var filesystemBlock string
+	if cacheDir := providerCacheDir(); cacheDir != "" {
+		filesystemBlock = fmt.Sprintf(`
+  filesystem_mirror {
+    path = "%s"
+  }`, cacheDir)
+		log.Infof("detected provider cache directory: %s", cacheDir)
+	}
+
 	terraformrcContent := fmt.Sprintf(`
-provider_installation {
+provider_installation {%s
   network_mirror {
-   url = "%s"
+    url = "%s"
   }
-}`, endpoint)
+}`, filesystemBlock, endpoint)
+
 	filePath := fmt.Sprintf("%s/config.tfrc", targetPath)
 	err := os.WriteFile(filePath, []byte(terraformrcContent), 0644)
 	if err != nil {

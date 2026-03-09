@@ -20,7 +20,7 @@ func (t *BaseTool) TenvName() string {
 
 func (t *BaseTool) Init(workingDir string) error {
 	t.WorkingDir = workingDir
-	cmd := exec.Command(t.ExecPath, "init", "-no-color", "-upgrade")
+	cmd := exec.Command(t.ExecPath, "init", "-upgrade")
 	c.Verbose(cmd)
 	cmd.Dir = workingDir
 	if err := cmd.Run(); err != nil {
@@ -30,7 +30,7 @@ func (t *BaseTool) Init(workingDir string) error {
 }
 
 func (t *BaseTool) Plan(planArtifactPath string) error {
-	cmd := exec.Command(t.ExecPath, "plan", "-no-color", "-out", planArtifactPath)
+	cmd := exec.Command(t.ExecPath, "plan", "-out", planArtifactPath)
 	c.Verbose(cmd)
 	cmd.Dir = t.WorkingDir
 	if err := cmd.Run(); err != nil {
@@ -42,9 +42,9 @@ func (t *BaseTool) Plan(planArtifactPath string) error {
 func (t *BaseTool) Apply(planArtifactPath string) error {
 	var cmd *exec.Cmd
 	if planArtifactPath != "" {
-		cmd = exec.Command(t.ExecPath, "apply", "-no-color", "-auto-approve", planArtifactPath)
+		cmd = exec.Command(t.ExecPath, "apply", "-auto-approve", planArtifactPath)
 	} else {
-		cmd = exec.Command(t.ExecPath, "apply", "-no-color", "-auto-approve")
+		cmd = exec.Command(t.ExecPath, "apply", "-auto-approve")
 	}
 	c.Verbose(cmd)
 	cmd.Dir = t.WorkingDir

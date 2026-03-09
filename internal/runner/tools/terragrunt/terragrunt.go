@@ -33,7 +33,6 @@ func (t *Terragrunt) getDefaultOptions(command string) ([]string, error) {
 			t.ChildExecPath,
 			"--terragrunt-working-dir",
 			t.WorkingDir,
-			"-no-color",
 		}, nil
 	}
 
@@ -47,7 +46,6 @@ func (t *Terragrunt) getDefaultOptions(command string) ([]string, error) {
 			t.ChildExecPath,
 			"--working-dir",
 			t.WorkingDir,
-			"-no-color",
 		}, nil
 	} else {
 		// Use legacy flags for versions below 0.73.0
@@ -57,7 +55,6 @@ func (t *Terragrunt) getDefaultOptions(command string) ([]string, error) {
 			t.ChildExecPath,
 			"--terragrunt-working-dir",
 			t.WorkingDir,
-			"-no-color",
 		}, nil
 	}
 }
@@ -118,9 +115,9 @@ func (t *Terragrunt) Show(planArtifactPath, mode string) ([]byte, error) {
 	}
 	switch mode {
 	case "json":
-		options = append(options, "-json", planArtifactPath)
+		options = append(options, "-no-color", "-json", planArtifactPath)
 	case "pretty":
-		options = append(options, planArtifactPath)
+		options = append(options, "-no-color", planArtifactPath)
 	default:
 		return nil, errors.New("invalid mode")
 	}

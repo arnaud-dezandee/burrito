@@ -67,7 +67,15 @@ var _ = Describe("Pod", func() {
 					Name:  "TF_CLI_ARGS_init",
 					Value: "--upgrade",
 				}))
-
+			})
+			It("should configure the pod for colorized terminal output", func() {
+				pods, err := reconciler.GetLinkedPods(run)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(pods.Items[0].Spec.Containers[0].TTY).To(BeTrue())
+				Expect(pods.Items[0].Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{
+					Name:  "TERM",
+					Value: "xterm-256color",
+				}))
 			})
 		})
 	})

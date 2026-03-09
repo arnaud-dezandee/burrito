@@ -71,7 +71,7 @@ const ModalLogsTerminal: React.FC<ModalLogsTerminalProps> = ({
                 <LogsTerminal
                   layer={layer}
                   run={layer.lastRun.id}
-                  className="h-[70vh] w-[60vw]"
+                  className="h-[82vh] w-[92vw] max-w-[1440px]"
                   variant={variant}
                 />
                 <OpenInLogsButton

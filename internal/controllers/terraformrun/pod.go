@@ -273,6 +273,7 @@ func defaultPodSpec(config *config.Config, layer *configv1alpha1.TerraformLayer,
 				Name:            "runner",
 				Image:           fmt.Sprintf("%s:%s", config.Runner.Image.Repository, config.Runner.Image.Tag),
 				ImagePullPolicy: corev1.PullPolicy(config.Runner.Image.PullPolicy),
+				TTY:             true,
 				Args:            config.Runner.Args,
 				Command:         config.Runner.Command,
 				VolumeMounts: []corev1.VolumeMount{
@@ -306,6 +307,10 @@ func defaultPodSpec(config *config.Config, layer *configv1alpha1.TerraformLayer,
 					{
 						Name:  "BURRITO_DATASTORE_HOSTNAME",
 						Value: config.Datastore.Hostname,
+					},
+					{
+						Name:  "TERM",
+						Value: "xterm-256color",
 					},
 				},
 			},

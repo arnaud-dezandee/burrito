@@ -9,6 +9,7 @@ import { reactQueryKeys } from '@/clients/reactQueryConfig';
 
 import AttemptsDropdown from '@/components/dropdowns/AttemptsDropdown';
 import AttemptButton from '@/components/buttons/AttemptButton';
+import { AnsiLogLine } from '@/components/tools/ansi';
 
 import SyncIcon from '@/assets/icons/SyncIcon';
 import CopyIcon from '@/assets/icons/CopyIcon';
@@ -71,7 +72,7 @@ const LogsTerminal: React.FC<LogsTerminalProps> = ({
 
   const handleCopy = () => {
     if (logsQuery.isSuccess) {
-      navigator.clipboard.writeText(logsQuery.data.results.join('')); // TODO: check if this works properly
+      navigator.clipboard.writeText(logsQuery.data.results.join('\n'));
       setDisplayLogsCopiedTooltip(true);
     }
   };
@@ -171,6 +172,7 @@ const LogsTerminal: React.FC<LogsTerminalProps> = ({
                     className={`
                       text-sm
                       px-4
+                      align-top
                       ${
                         variant === 'light'
                           ? 'text-primary-600'
@@ -180,7 +182,9 @@ const LogsTerminal: React.FC<LogsTerminalProps> = ({
                   >
                     {i + 1}
                   </td>
-                  <td>{log}</td>
+                  <td className="pr-4 align-top">
+                    <AnsiLogLine line={log} variant={variant} />
+                  </td>
                 </tr>
               ))}
           </tbody>

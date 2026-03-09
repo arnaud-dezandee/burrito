@@ -169,8 +169,13 @@ func (s *Server) Exec() {
 	api.GET("/layers", s.API.LayersHandler)
 	api.POST("/layers/:namespace/:layer/sync", s.API.SyncLayerHandler)
 	api.POST("/layers/:namespace/:layer/apply", s.API.ApplyLayerHandler)
+	api.GET("/stacks", s.API.StacksHandler)
+	api.POST("/stacks/:namespace/:stack/sync", s.API.SyncStackHandler)
+	api.POST("/stacks/:namespace/:stack/apply", s.API.ApplyStackHandler)
 	api.GET("/repositories", s.API.RepositoriesHandler)
 	api.GET("/logs/:namespace/:layer/:run/:attempt", s.API.GetLogsHandler)
+	api.GET("/stack-logs/:namespace/:stack/:run/:attempt", s.API.GetStackLogsHandler)
+	api.GET("/stack-plans/:namespace/:stack/:run/:attempt", s.API.GetStackPlanHandler)
 	api.GET("/run/:namespace/:layer/:run/attempts", s.API.GetAttemptsHandler)
 
 	// Redirect root to layers if authenticated, otherwise to login

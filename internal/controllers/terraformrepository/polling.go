@@ -23,11 +23,33 @@ func (r *Reconciler) retrieveManagedLayers(ctx context.Context, repository *conf
 	return managedLayers, nil
 }
 
+func (r *Reconciler) retrieveManagedStacks(ctx context.Context, repository *configv1alpha1.TerraformRepository) ([]configv1alpha1.TerragruntStack, error) {
+	stacks := &configv1alpha1.TerragruntStackList{}
+	if err := r.List(ctx, stacks); err != nil {
+		return nil, err
+	}
+	managedStacks := []configv1alpha1.TerragruntStack{}
+	for _, stack := range stacks.Items {
+		if stack.Spec.Repository.Name == repository.Name {
+			managedStacks = append(managedStacks, stack)
+		}
+	}
+	return managedStacks, nil
+}
+
 // Returns a list of all refs (branches and tags) among a list of layers from the same repository (duplicated allowed)
 func retrieveAllLayerRefs(layers []configv1alpha1.TerraformLayer) []string {
 	refs := []string{}
 	for _, layer := range layers {
 		refs = append(refs, layer.Spec.Branch)
+	}
+	return refs
+}
+
+func retrieveAllStackRefs(stacks []configv1alpha1.TerragruntStack) []string {
+	refs := []string{}
+	for _, stack := range stacks {
+		refs = append(refs, stack.Spec.Branch)
 	}
 	return refs
 }
@@ -43,10 +65,29 @@ func retrieveLayersForRef(ref string, layers []configv1alpha1.TerraformLayer) []
 	return result
 }
 
+func retrieveStacksForRef(ref string, stacks []configv1alpha1.TerragruntStack) []configv1alpha1.TerragruntStack {
+	result := []configv1alpha1.TerragruntStack{}
+	for _, stack := range stacks {
+		if stack.Spec.Branch == ref {
+			result = append(result, stack)
+		}
+	}
+	return result
+}
+
 // Checks if there is at least one new layer in the list of layers (without last branch commit annotation)
 func isThereANewLayer(layers []configv1alpha1.TerraformLayer) bool {
 	for _, layer := range layers {
 		if _, ok := layer.Annotations[annotations.LastBranchCommit]; !ok {
+			return true
+		}
+	}
+	return false
+}
+
+func isThereANewStack(stacks []configv1alpha1.TerragruntStack) bool {
+	for _, stack := range stacks {
+		if _, ok := stack.Annotations[annotations.LastBranchCommit]; !ok {
 			return true
 		}
 	}

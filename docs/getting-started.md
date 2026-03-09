@@ -120,6 +120,35 @@ spec:
 
 The controller will create a runner pod in your tenant namespace to synchronize the repository and apply the Terraform code.
 
+## 4. Synchronize an implicit Terragrunt stack
+
+If your repository is organized as a Terragrunt stack, create a `TerragruntStack` instead of multiple `TerraformLayer` resources:
+
+```yaml
+apiVersion: config.terraform.padok.cloud/v1alpha1
+kind: TerragruntStack
+metadata:
+  name: platform-prod
+  namespace: burrito
+spec:
+  branch: main
+  path: live/prod
+  repository:
+    name: burrito
+    namespace: burrito
+  terragrunt:
+    enabled: true
+  opentofu:
+    enabled: true
+```
+
+V1 behavior:
+
+- Burrito runs the full implicit stack from `spec.path`.
+- Terragrunt computes the DAG and executes units concurrently.
+- Any relevant change under the stack root triggers a full stack run.
+- `autoApply` and PR/MR workflows are not supported for stacks.
+
 ## Guides
 
 - For detailed guides on how to use Burrito, see the [Guides](./guides/index.md) section.

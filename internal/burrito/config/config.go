@@ -86,7 +86,9 @@ type ControllerTimers struct {
 
 type RunnerConfig struct {
 	Action                     string      `mapstructure:"action"`
+	TargetKind                 string      `mapstructure:"targetKind"`
 	Layer                      Layer       `mapstructure:"layer"`
+	Stack                      Layer       `mapstructure:"stack"`
 	Run                        string      `mapstructure:"run"`
 	SSHKnownHostsConfigMapName string      `mapstructure:"sshKnownHostsConfigMapName"`
 	Image                      ImageConfig `mapstructure:"image"`
@@ -238,6 +240,7 @@ func TestConfig() *Config {
 		Runner: RunnerConfig{
 			SSHKnownHostsConfigMapName: "burrito-ssh-known-hosts",
 			Layer:                      Layer{},
+			Stack:                      Layer{},
 		},
 	}
 }

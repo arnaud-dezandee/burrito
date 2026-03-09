@@ -97,6 +97,36 @@ func GetTerragruntVersion(repository *TerraformRepository, layer *TerraformLayer
 	return chooseString(repository.Spec.TerragruntConfig.Version, layer.Spec.TerragruntConfig.Version)
 }
 
+func GetTerraformEnabledForStack(repository *TerraformRepository, stack *TerragruntStack) bool {
+	if isEnabled(stack.Spec.OpenTofuConfig.Enabled) {
+		return false
+	}
+	return chooseBool(repository.Spec.TerraformConfig.Enabled, stack.Spec.TerraformConfig.Enabled, false)
+}
+
+func GetOpenTofuEnabledForStack(repository *TerraformRepository, stack *TerragruntStack) bool {
+	if isEnabled(stack.Spec.TerraformConfig.Enabled) {
+		return false
+	}
+	return chooseBool(repository.Spec.OpenTofuConfig.Enabled, stack.Spec.OpenTofuConfig.Enabled, false)
+}
+
+func GetTerraformVersionForStack(repository *TerraformRepository, stack *TerragruntStack) string {
+	return chooseString(repository.Spec.TerraformConfig.Version, stack.Spec.TerraformConfig.Version)
+}
+
+func GetOpenTofuVersionForStack(repository *TerraformRepository, stack *TerragruntStack) string {
+	return chooseString(repository.Spec.OpenTofuConfig.Version, stack.Spec.OpenTofuConfig.Version)
+}
+
+func GetTerragruntEnabledForStack(repository *TerraformRepository, stack *TerragruntStack) bool {
+	return chooseBool(repository.Spec.TerragruntConfig.Enabled, stack.Spec.TerragruntConfig.Enabled, false)
+}
+
+func GetTerragruntVersionForStack(repository *TerraformRepository, stack *TerragruntStack) string {
+	return chooseString(repository.Spec.TerragruntConfig.Version, stack.Spec.TerragruntConfig.Version)
+}
+
 func GetOverrideRunnerSpec(repository *TerraformRepository, layer *TerraformLayer) OverrideRunnerSpec {
 	return OverrideRunnerSpec{
 		Tolerations:  overrideTolerations(repository.Spec.OverrideRunnerSpec.Tolerations, layer.Spec.OverrideRunnerSpec.Tolerations),
@@ -130,12 +160,49 @@ func GetRunHistoryPolicy(repository *TerraformRepository, layer *TerraformLayer)
 	}
 }
 
+func GetOverrideRunnerSpecForStack(repository *TerraformRepository, stack *TerragruntStack) OverrideRunnerSpec {
+	return OverrideRunnerSpec{
+		Tolerations:  overrideTolerations(repository.Spec.OverrideRunnerSpec.Tolerations, stack.Spec.OverrideRunnerSpec.Tolerations),
+		Affinity:     overrideAffinity(repository.Spec.OverrideRunnerSpec.Affinity, stack.Spec.OverrideRunnerSpec.Affinity),
+		NodeSelector: mergeMaps(repository.Spec.OverrideRunnerSpec.NodeSelector, stack.Spec.OverrideRunnerSpec.NodeSelector),
+		Metadata: MetadataOverride{
+			Annotations: mergeMaps(repository.Spec.OverrideRunnerSpec.Metadata.Annotations, stack.Spec.OverrideRunnerSpec.Metadata.Annotations),
+			Labels:      mergeMaps(repository.Spec.OverrideRunnerSpec.Metadata.Labels, stack.Spec.OverrideRunnerSpec.Metadata.Labels),
+		},
+		Env:                mergeEnvVars(repository.Spec.OverrideRunnerSpec.Env, stack.Spec.OverrideRunnerSpec.Env),
+		Volumes:            mergeVolumes(repository.Spec.OverrideRunnerSpec.Volumes, stack.Spec.OverrideRunnerSpec.Volumes),
+		VolumeMounts:       mergeVolumeMounts(repository.Spec.OverrideRunnerSpec.VolumeMounts, stack.Spec.OverrideRunnerSpec.VolumeMounts),
+		Resources:          mergeResources(repository.Spec.OverrideRunnerSpec.Resources, stack.Spec.OverrideRunnerSpec.Resources),
+		EnvFrom:            mergeEnvFrom(repository.Spec.OverrideRunnerSpec.EnvFrom, stack.Spec.OverrideRunnerSpec.EnvFrom),
+		Image:              chooseString(repository.Spec.OverrideRunnerSpec.Image, stack.Spec.OverrideRunnerSpec.Image),
+		ImagePullPolicy:    chooseImagePullPolicy(repository.Spec.OverrideRunnerSpec.ImagePullPolicy, stack.Spec.OverrideRunnerSpec.ImagePullPolicy),
+		ServiceAccountName: chooseString(repository.Spec.OverrideRunnerSpec.ServiceAccountName, stack.Spec.OverrideRunnerSpec.ServiceAccountName),
+		ImagePullSecrets:   mergeImagePullSecrets(repository.Spec.OverrideRunnerSpec.ImagePullSecrets, stack.Spec.OverrideRunnerSpec.ImagePullSecrets),
+		InitContainers:     MergeInitContainers(repository.Spec.OverrideRunnerSpec.InitContainers, stack.Spec.OverrideRunnerSpec.InitContainers),
+		Command:            ChooseSlice(repository.Spec.OverrideRunnerSpec.Command, stack.Spec.OverrideRunnerSpec.Command),
+		Args:               ChooseSlice(repository.Spec.OverrideRunnerSpec.Args, stack.Spec.OverrideRunnerSpec.Args),
+		ExtraInitArgs:      overrideExtraArgs(repository.Spec.OverrideRunnerSpec.ExtraInitArgs, stack.Spec.OverrideRunnerSpec.ExtraInitArgs),
+		ExtraPlanArgs:      overrideExtraArgs(repository.Spec.OverrideRunnerSpec.ExtraPlanArgs, stack.Spec.OverrideRunnerSpec.ExtraPlanArgs),
+		ExtraApplyArgs:     overrideExtraArgs(repository.Spec.OverrideRunnerSpec.ExtraApplyArgs, stack.Spec.OverrideRunnerSpec.ExtraApplyArgs),
+	}
+}
+
+func GetRunHistoryPolicyForStack(repository *TerraformRepository, stack *TerragruntStack) RunHistoryPolicy {
+	return RunHistoryPolicy{
+		KeepLastRuns: chooseInt(repository.Spec.RunHistoryPolicy.KeepLastRuns, stack.Spec.RunHistoryPolicy.KeepLastRuns, 5),
+	}
+}
+
 func GetApplyWithoutPlanArtifactEnabled(repository *TerraformRepository, layer *TerraformLayer) bool {
 	return chooseBool(repository.Spec.RemediationStrategy.ApplyWithoutPlanArtifact, layer.Spec.RemediationStrategy.ApplyWithoutPlanArtifact, false)
 }
 
 func GetAutoApplyEnabled(repo *TerraformRepository, layer *TerraformLayer) bool {
 	return chooseBool(repo.Spec.RemediationStrategy.AutoApply, layer.Spec.RemediationStrategy.AutoApply, false)
+}
+
+func GetAutoApplyEnabledForStack(repo *TerraformRepository, stack *TerragruntStack) bool {
+	return chooseBool(repo.Spec.RemediationStrategy.AutoApply, stack.Spec.RemediationStrategy.AutoApply, false)
 }
 
 func isEnabled(enabled *bool) bool {

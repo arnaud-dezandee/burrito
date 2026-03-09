@@ -1,0 +1,21 @@
+apiVersion: config.terraform.padok.cloud/v1alpha1
+kind: TerragruntStack
+metadata:
+  name: platform-prod
+  namespace: burrito-project
+spec:
+  branch: main
+  path: live/prod
+  parallelism: 4
+  repository:
+    name: infra-repo
+    namespace: burrito-project
+  terragrunt:
+    enabled: true
+    version: "0.82.3"
+  opentofu:
+    enabled: true
+    version: "1.8.8"
+  additionalTargetRefs:
+    - modules/network
+    - modules/security

@@ -34,6 +34,22 @@ The homepage displays a list of all the Terraform layers that have been added to
 
 ![Homepage](../assets/demo/homepage.png)
 
+### Stacks
+
+The UI also exposes a dedicated `Stacks` page for `TerragruntStack` resources.
+
+Each stack view shows:
+
+- Namespace
+- Repository
+- Branch
+- Stack root path
+- Aggregate result for the latest run
+- Stack state
+- Expandable per-unit summaries
+
+Manual sync and manual apply actions are available directly from the stack list.
+
 ### Terraform / Terragrunt logs
 
 Click on the layer card to view the Terraform or Terragrunt logs for that layer. You can explore previous runs and view the logs for each run. The maximum number of logs to keep is configurable.

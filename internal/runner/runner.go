@@ -25,7 +25,9 @@ type Runner struct {
 	Datastore  datastore.Client
 	Client     client.Client
 	Layer      *configv1alpha1.TerraformLayer
+	Stack      *configv1alpha1.TerragruntStack
 	Run        *configv1alpha1.TerraformRun
+	StackRun   *configv1alpha1.TerragruntStackRun
 	Repository *configv1alpha1.TerraformRepository
 	repoDir    string
 	workingDir string
@@ -78,7 +80,7 @@ func (r *Runner) initClients() error {
 // Initialize the runner: retrieve linked resources (layer, run, repository),
 // fetch the repository content, install the binaries and configure Hermitcrab mirror.
 func (r *Runner) Init() error {
-	log.Infof("retrieving linked TerraformLayer and TerraformRepository")
+	log.Infof("retrieving linked resources")
 	err := r.GetResources()
 	if err != nil {
 		log.Errorf("error getting kubernetes resources: %s", err)
@@ -86,7 +88,11 @@ func (r *Runner) Init() error {
 	}
 
 	r.repoDir = filepath.Join(r.config.Runner.RepositoryPath, "content")
-	r.workingDir = filepath.Join(r.repoDir, r.Layer.Spec.Path)
+	if r.isStackTarget() {
+		r.workingDir = filepath.Join(r.repoDir, r.Stack.Spec.Path)
+	} else {
+		r.workingDir = filepath.Join(r.repoDir, r.Layer.Spec.Path)
+	}
 
 	err = r.cloneGitBundle()
 	if err != nil {
@@ -95,7 +101,11 @@ func (r *Runner) Init() error {
 	}
 
 	log.Infof("installing binaries...")
-	r.exec, err = tools.InstallBinaries(r.Layer, r.Repository, r.config.Runner.RunnerBinaryPath, r.workingDir)
+	if r.isStackTarget() {
+		r.exec, err = tools.InstallBinariesForStack(r.Stack, r.Repository, r.config.Runner.RunnerBinaryPath, r.workingDir)
+	} else {
+		r.exec, err = tools.InstallBinaries(r.Layer, r.Repository, r.config.Runner.RunnerBinaryPath, r.workingDir)
+	}
 	if err != nil {
 		log.Errorf("error installing binaries: %s", err)
 		return err
@@ -121,6 +131,9 @@ func (r *Runner) EnableHermitcrab() error {
 
 // Retrieve linked resources (layer, run, repository) from the Kubernetes API.
 func (r *Runner) GetResources() error {
+	if r.isStackTarget() {
+		return r.getStackResources()
+	}
 	layer := &configv1alpha1.TerraformLayer{}
 	log.Infof("getting layer %s/%s", r.config.Runner.Layer.Namespace, r.config.Runner.Layer.Name)
 	err := r.Client.Get(context.TODO(), types.NamespacedName{
@@ -160,8 +173,53 @@ func (r *Runner) GetResources() error {
 	return nil
 }
 
+func (r *Runner) getStackResources() error {
+	stack := &configv1alpha1.TerragruntStack{}
+	log.Infof("getting stack %s/%s", r.config.Runner.Stack.Namespace, r.config.Runner.Stack.Name)
+	err := r.Client.Get(context.TODO(), types.NamespacedName{
+		Namespace: r.config.Runner.Stack.Namespace,
+		Name:      r.config.Runner.Stack.Name,
+	}, stack)
+	if err != nil {
+		return err
+	}
+	r.Stack = stack
+
+	stackRun := &configv1alpha1.TerragruntStackRun{}
+	log.Infof("getting stack run %s/%s", stack.Namespace, r.config.Runner.Run)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Namespace: stack.Namespace,
+		Name:      r.config.Runner.Run,
+	}, stackRun)
+	if err != nil {
+		return err
+	}
+	r.StackRun = stackRun
+
+	repository := &configv1alpha1.TerraformRepository{}
+	log.Infof("getting repo %s/%s", stack.Spec.Repository.Namespace, stack.Spec.Repository.Name)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Namespace: stack.Spec.Repository.Namespace,
+		Name:      stack.Spec.Repository.Name,
+	}, repository)
+	if err != nil {
+		return err
+	}
+	r.Repository = repository
+	return nil
+}
+
 func (r *Runner) cloneGitBundle() error {
-	bundle, err := r.Datastore.GetGitBundle(r.Repository.Namespace, r.Repository.Name, r.Layer.Spec.Branch, r.Run.Spec.Layer.Revision)
+	ref := ""
+	revision := ""
+	if r.isStackTarget() {
+		ref = r.Stack.Spec.Branch
+		revision = r.StackRun.Spec.Stack.Revision
+	} else {
+		ref = r.Layer.Spec.Branch
+		revision = r.Run.Spec.Layer.Revision
+	}
+	bundle, err := r.Datastore.GetGitBundle(r.Repository.Namespace, r.Repository.Name, ref, revision)
 	if err != nil {
 		log.Errorf("error fetching git bundle from datastore: %s", err)
 		return err
@@ -172,8 +230,8 @@ func (r *Runner) cloneGitBundle() error {
 		log.Errorf("error creating repository directory: %s", err)
 	}
 
-	sanitizedBranch := strings.ReplaceAll(r.Layer.Spec.Branch, "/", "--")
-	bundlePath := filepath.Join(r.config.Runner.RepositoryPath, fmt.Sprintf("%s-%s.gitbundle", sanitizedBranch, r.Run.Spec.Layer.Revision))
+	sanitizedBranch := strings.ReplaceAll(ref, "/", "--")
+	bundlePath := filepath.Join(r.config.Runner.RepositoryPath, fmt.Sprintf("%s-%s.gitbundle", sanitizedBranch, revision))
 	err = os.WriteFile(bundlePath, bundle, 0644)
 	if err != nil {
 		log.Errorf("error writing git bundle to disk: %s", err)
@@ -182,7 +240,7 @@ func (r *Runner) cloneGitBundle() error {
 
 	// Remove prefix not authorized by `git clone` command (because users could provide `refs/tags/v1.0.0` or `refs/heads/main`)
 	// in their TerraformLayer spec.
-	branch := strings.TrimPrefix(r.Layer.Spec.Branch, "refs/heads/")
+	branch := strings.TrimPrefix(ref, "refs/heads/")
 	branch = strings.TrimPrefix(branch, "refs/tags/")
 
 	cmd := exec.Command("git", "clone", bundlePath, r.repoDir, "--branch", branch)
@@ -192,7 +250,11 @@ func (r *Runner) cloneGitBundle() error {
 		return err
 	}
 
-	log.Infof("successfully fetched and opened git bundle from the datastore: repo=%s/%s ref=%s rev=%s", r.Repository.Namespace, r.Repository.Name, r.Layer.Spec.Branch, r.Run.Spec.Layer.Revision)
+	log.Infof("successfully fetched and opened git bundle from the datastore: repo=%s/%s ref=%s rev=%s", r.Repository.Namespace, r.Repository.Name, ref, revision)
 
 	return nil
+}
+
+func (r *Runner) isStackTarget() bool {
+	return r.config.Runner.TargetKind == "stack"
 }

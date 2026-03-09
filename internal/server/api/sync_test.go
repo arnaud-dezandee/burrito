@@ -231,4 +231,107 @@ var _ = Describe("Sync API", func() {
 		})
 	})
 
+	Describe("ApplyStackHandler", func() {
+		It("should trigger apply on an existing stack", func() {
+			stack := &configv1alpha1.TerragruntStack{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "my-stack",
+					Namespace:   "default",
+					Annotations: map[string]string{},
+				},
+				Spec: configv1alpha1.TerragruntStackSpec{
+					Path:   "live/prod",
+					Branch: "main",
+				},
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(newScheme()).
+				WithObjects(stack).
+				Build()
+
+			a := &api.API{Client: fakeClient}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/stacks/default/my-stack/apply", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			setRouteParams(c, []string{"namespace", "stack"}, []string{"default", "my-stack"})
+
+			err := a.ApplyStackHandler(c)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(rec.Code).To(Equal(http.StatusOK))
+
+			var body map[string]string
+			Expect(json.Unmarshal(rec.Body.Bytes(), &body)).NotTo(HaveOccurred())
+			Expect(body["status"]).To(Equal("Stack apply triggered"))
+		})
+	})
+
+	Describe("SyncStackHandler", func() {
+		It("should trigger sync on an existing stack", func() {
+			stack := &configv1alpha1.TerragruntStack{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "sync-stack",
+					Namespace:   "default",
+					Annotations: map[string]string{},
+				},
+				Spec: configv1alpha1.TerragruntStackSpec{
+					Path:   "live/prod",
+					Branch: "main",
+				},
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(newScheme()).
+				WithObjects(stack).
+				Build()
+
+			a := &api.API{Client: fakeClient}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/stacks/default/sync-stack/sync", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			setRouteParams(c, []string{"namespace", "stack"}, []string{"default", "sync-stack"})
+
+			err := a.SyncStackHandler(c)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(rec.Code).To(Equal(http.StatusOK))
+
+			var body map[string]string
+			Expect(json.Unmarshal(rec.Body.Bytes(), &body)).NotTo(HaveOccurred())
+			Expect(body["status"]).To(Equal("Stack sync triggered"))
+		})
+
+		It("should return conflict when stack sync is already pending", func() {
+			stack := &configv1alpha1.TerragruntStack{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "already-syncing-stack",
+					Namespace: "default",
+					Annotations: map[string]string{
+						annotations.SyncNow: "true",
+					},
+				},
+				Spec: configv1alpha1.TerragruntStackSpec{
+					Path:   "live/prod",
+					Branch: "main",
+				},
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(newScheme()).
+				WithObjects(stack).
+				Build()
+
+			a := &api.API{Client: fakeClient}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/stacks/default/already-syncing-stack/sync", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			setRouteParams(c, []string{"namespace", "stack"}, []string{"default", "already-syncing-stack"})
+
+			err := a.SyncStackHandler(c)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(rec.Code).To(Equal(http.StatusConflict))
+		})
+	})
 })

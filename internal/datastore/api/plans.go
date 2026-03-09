@@ -24,6 +24,22 @@ func getPlanArgs(c echo.Context) (string, string, string, string, string, error)
 	return namespace, layer, run, attempt, format, nil
 }
 
+func getStackPlanArgs(c echo.Context) (string, string, string, string, string, string, error) {
+	namespace := c.QueryParam("namespace")
+	stack := c.QueryParam("stack")
+	run := c.QueryParam("run")
+	attempt := c.QueryParam("attempt")
+	unit := c.QueryParam("unit")
+	format := c.QueryParam("format")
+	if namespace == "" || stack == "" || run == "" {
+		return "", "", "", "", "", "", fmt.Errorf("missing query parameters")
+	}
+	if format == "" {
+		format = "json"
+	}
+	return namespace, stack, run, attempt, unit, format, nil
+}
+
 func (a *API) GetPlanHandler(c echo.Context) error {
 	var err error
 	var content []byte
@@ -62,6 +78,43 @@ func (a *API) PutPlanHandler(c echo.Context) error {
 	err = a.Storage.PutPlan(namespace, layer, run, attempt, format, content)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, "could not put plan, there's an issue with the storage backend: "+err.Error())
+	}
+	return c.NoContent(http.StatusOK)
+}
+
+func (a *API) GetStackPlanHandler(c echo.Context) error {
+	namespace, stack, run, attempt, unit, format, err := getStackPlanArgs(c)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+	if attempt == "" {
+		return c.String(http.StatusBadRequest, "missing query parameters")
+	}
+	content, err := a.Storage.GetStackPlan(namespace, stack, run, attempt, unit, format)
+	if storageerrors.NotFound(err) {
+		return c.String(http.StatusNotFound, "No plan for this attempt")
+	}
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "could not get stack plan, there's an issue with the storage backend")
+	}
+	return c.Blob(http.StatusOK, "application/octet-stream", content)
+}
+
+func (a *API) PutStackPlanHandler(c echo.Context) error {
+	namespace, stack, run, attempt, unit, format, err := getStackPlanArgs(c)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+	if attempt == "" || format == "" {
+		return c.String(http.StatusBadRequest, "missing query parameters")
+	}
+	content, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.String(http.StatusBadRequest, "could not read request body: "+err.Error())
+	}
+	err = a.Storage.PutStackPlan(namespace, stack, run, attempt, unit, format, content)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "could not put stack plan, there's an issue with the storage backend: "+err.Error())
 	}
 	return c.NoContent(http.StatusOK)
 }

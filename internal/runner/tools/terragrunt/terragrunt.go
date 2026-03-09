@@ -2,7 +2,9 @@ package terragrunt
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
+	"strconv"
 
 	"github.com/blang/semver/v4"
 	c "github.com/padok-team/burrito/internal/utils/cmd"
@@ -136,4 +138,62 @@ func (t *Terragrunt) Show(planArtifactPath, mode string) ([]byte, error) {
 
 func (t *Terragrunt) GetExecPath() string {
 	return t.ExecPath
+}
+
+func (t *Terragrunt) RunAllPlan(outDir, jsonOutDir, reportFile string, parallelism *int) error {
+	options, err := t.getDefaultOptions("run")
+	if err != nil {
+		return err
+	}
+	options = append(options, "--all")
+	if parallelism != nil {
+		options = append(options, "--parallelism", strconv.Itoa(*parallelism))
+	}
+	if outDir != "" {
+		options = append(options, "--out-dir", outDir)
+	}
+	if jsonOutDir != "" {
+		options = append(options, "--json-out-dir", jsonOutDir)
+	}
+	if reportFile != "" {
+		options = append(options, "--report-file", reportFile)
+	}
+	options = append(options, "--", "plan")
+	cmd := exec.Command(t.ExecPath, options...)
+	c.Verbose(cmd)
+	cmd.Dir = t.WorkingDir
+	return cmd.Run()
+}
+
+func (t *Terragrunt) RunAllApply(reportFile string, parallelism *int) error {
+	options, err := t.getDefaultOptions("run")
+	if err != nil {
+		return err
+	}
+	options = append(options, "--all")
+	if parallelism != nil {
+		options = append(options, "--parallelism", strconv.Itoa(*parallelism))
+	}
+	if reportFile != "" {
+		options = append(options, "--report-file", reportFile)
+	}
+	options = append(options, "--", "apply", "-auto-approve")
+	cmd := exec.Command(t.ExecPath, options...)
+	c.Verbose(cmd)
+	cmd.Dir = t.WorkingDir
+	return cmd.Run()
+}
+
+func (t *Terragrunt) ShowPlanFile(planArtifactPath, mode string) ([]byte, error) {
+	var cmd *exec.Cmd
+	switch mode {
+	case "json":
+		cmd = exec.Command(t.ChildExecPath, "show", "-json", planArtifactPath)
+	case "pretty":
+		cmd = exec.Command(t.ChildExecPath, "show", planArtifactPath)
+	default:
+		return nil, fmt.Errorf("invalid mode %s", mode)
+	}
+	cmd.Dir = t.WorkingDir
+	return cmd.Output()
 }

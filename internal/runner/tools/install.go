@@ -131,3 +131,54 @@ func InstallBinaries(layer *configv1alpha1.TerraformLayer, repo *configv1alpha1.
 	}
 	return baseExec, nil
 }
+
+func InstallBinariesForStack(stack *configv1alpha1.TerragruntStack, repo *configv1alpha1.TerraformRepository, binaryPath, workingDir string) (BaseExec, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	err = os.Chdir(workingDir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = os.Chdir(cwd)
+	}()
+
+	var baseExec BaseExec
+	var baseExecVersion string
+	if configv1alpha1.GetTerraformEnabledForStack(repo, stack) {
+		baseExecVersion, err = detect(binaryPath, "terraform", configv1alpha1.GetTerraformVersionForStack(repo, stack))
+		if err != nil {
+			return nil, err
+		}
+		baseExec = tf.NewTerraform(filepath.Join(binaryPath, "Terraform", baseExecVersion, "terraform"))
+	} else if configv1alpha1.GetOpenTofuEnabledForStack(repo, stack) {
+		baseExecVersion, err = detect(binaryPath, "tofu", configv1alpha1.GetOpenTofuVersionForStack(repo, stack))
+		if err != nil {
+			return nil, err
+		}
+		baseExec = ot.NewOpenTofu(filepath.Join(binaryPath, "OpenTofu", baseExecVersion, "tofu"))
+	} else {
+		return nil, errors.New("Please enable either Terraform or OpenTofu in the repository or stack configuration")
+	}
+	if err := install(binaryPath, baseExec.TenvName(), baseExecVersion); err != nil {
+		return nil, err
+	}
+	if configv1alpha1.GetTerragruntEnabledForStack(repo, stack) {
+		terragruntVersion := configv1alpha1.GetTerragruntVersionForStack(repo, stack)
+		terragruntVersion, err := detect(binaryPath, "terragrunt", terragruntVersion)
+		if err != nil {
+			return nil, err
+		}
+		if err := install(binaryPath, "terragrunt", terragruntVersion); err != nil {
+			return nil, err
+		}
+		return &tg.Terragrunt{
+			ExecPath:      filepath.Join(binaryPath, "Terragrunt", terragruntVersion, "terragrunt"),
+			ChildExecPath: baseExec.GetExecPath(),
+			Version:       terragruntVersion,
+		}, nil
+	}
+	return nil, errors.New("Terragrunt must be enabled for TerragruntStack")
+}

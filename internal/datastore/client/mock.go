@@ -51,6 +51,22 @@ func (c *MockClient) PutLogs(namespace string, layer string, run string, attempt
 	return nil
 }
 
+func (c *MockClient) GetStackPlan(namespace string, stack string, run string, attempt string, unit string, format string) ([]byte, error) {
+	return nil, nil
+}
+
+func (c *MockClient) PutStackPlan(namespace string, stack string, run string, attempt string, unit string, format string, content []byte) error {
+	return nil
+}
+
+func (c *MockClient) GetStackLogs(namespace string, stack string, run string, attempt string, unit string) ([]string, error) {
+	return nil, nil
+}
+
+func (c *MockClient) PutStackLogs(namespace string, stack string, run string, attempt string, unit string, content []byte) error {
+	return nil
+}
+
 func (c *MockClient) GetAttempts(namespace string, layer string, run string) (int, error) {
 	return 0, nil
 }

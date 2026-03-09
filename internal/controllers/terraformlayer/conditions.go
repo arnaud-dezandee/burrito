@@ -3,13 +3,12 @@ package terraformlayer
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
 	"time"
 
 	configv1alpha1 "github.com/padok-team/burrito/api/v1alpha1"
 	"github.com/padok-team/burrito/internal/annotations"
 	terraformrun "github.com/padok-team/burrito/internal/controllers/terraformrun"
+	"github.com/padok-team/burrito/internal/utils/pathmatcher"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -340,40 +339,5 @@ func (r *Reconciler) IsApplyScheduled(t *configv1alpha1.TerraformLayer) (metav1.
 }
 
 func LayerFilesHaveChanged(layer configv1alpha1.TerraformLayer, changedFiles []string) bool {
-	if len(changedFiles) == 0 {
-		return true
-	}
-
-	// At last one changed file must be under refresh path
-	for _, f := range changedFiles {
-		f = ensureAbsPath(f)
-		if strings.Contains(f, layer.Spec.Path) {
-			return true
-		}
-		// Check if the file is under an additionnal trigger path
-		if val, ok := layer.Annotations[annotations.AdditionnalTriggerPaths]; ok {
-			for _, p := range strings.Split(val, ",") {
-				p = strings.TrimSpace(p)
-				if strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") {
-					// Dot-relative path: resolve from layer spec path
-					p = ensureAbsPath(filepath.Clean(filepath.Join(layer.Spec.Path, p)))
-				} else {
-					// Plain path or absolute: match against repository root
-					p = ensureAbsPath(filepath.Clean(p))
-				}
-				if strings.Contains(f, p) {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-func ensureAbsPath(input string) string {
-	if !filepath.IsAbs(input) {
-		return string(filepath.Separator) + input
-	}
-	return input
+	return pathmatcher.FilesHaveChanged(layer.Spec.Path, layer.Annotations, changedFiles)
 }

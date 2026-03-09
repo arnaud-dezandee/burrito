@@ -40,6 +40,8 @@ import (
 	"github.com/padok-team/burrito/internal/controllers/terraformpullrequest"
 	"github.com/padok-team/burrito/internal/controllers/terraformrepository"
 	"github.com/padok-team/burrito/internal/controllers/terraformrun"
+	"github.com/padok-team/burrito/internal/controllers/terragruntstack"
+	"github.com/padok-team/burrito/internal/controllers/terragruntstackrun"
 	datastore "github.com/padok-team/burrito/internal/datastore/client"
 	"github.com/padok-team/burrito/internal/repository/credentials"
 	"github.com/sirupsen/logrus"
@@ -172,6 +174,29 @@ func (c *Controllers) Exec() {
 				log.Fatalf("unable to create pullrequest controller: %s", err)
 			}
 			log.Infof("pullrequest controller started successfully")
+		case "stack":
+			if err = (&terragruntstack.Reconciler{
+				Client:    mgr.GetClient(),
+				Scheme:    mgr.GetScheme(),
+				Config:    c.config,
+				Recorder:  mgr.GetEventRecorderFor("Burrito"),
+				Datastore: datastoreClient,
+			}).SetupWithManager(mgr); err != nil {
+				log.Fatalf("unable to create stack controller: %s", err)
+			}
+			log.Infof("stack controller started successfully")
+		case "stackrun":
+			if err = (&terragruntstackrun.Reconciler{
+				Client:       mgr.GetClient(),
+				Scheme:       mgr.GetScheme(),
+				Recorder:     mgr.GetEventRecorderFor("Burrito"),
+				Config:       c.config,
+				Datastore:    datastoreClient,
+				K8SLogClient: clientset,
+			}).SetupWithManager(mgr); err != nil {
+				log.Fatalf("unable to create stackrun controller: %s", err)
+			}
+			log.Infof("stackrun controller started successfully")
 		default:
 			log.Infof("unrecognized controller type %s, ignoring", ctrlType)
 		}

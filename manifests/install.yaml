@@ -10491,6 +10491,59 @@ rules:
   - patch
   - update
 - apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstacks
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstacks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstacks/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstackruns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstackruns/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstackruns/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -10620,6 +10673,58 @@ rules:
   - config.terraform.padok.cloud
   resources:
   - terraformruns/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstacks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstacks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstacks/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstackruns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstackruns/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.terraform.padok.cloud
+  resources:
+  - terragruntstackruns/status
   verbs:
   - get
   - patch

@@ -25,6 +25,18 @@ func getLogsArgs(c echo.Context) (string, string, string, string, error) {
 	return namespace, layer, run, attempt, nil
 }
 
+func getStackLogsArgs(c echo.Context) (string, string, string, string, string, error) {
+	namespace := c.QueryParam("namespace")
+	stack := c.QueryParam("stack")
+	run := c.QueryParam("run")
+	attempt := c.QueryParam("attempt")
+	unit := c.QueryParam("unit")
+	if namespace == "" || stack == "" || run == "" {
+		return "", "", "", "", "", fmt.Errorf("missing query parameters")
+	}
+	return namespace, stack, run, attempt, unit, nil
+}
+
 func (a *API) GetLogsHandler(c echo.Context) error {
 	var err error
 	var content []byte
@@ -66,6 +78,45 @@ func (a *API) PutLogsHandler(c echo.Context) error {
 	if err != nil {
 		c.Logger().Errorf("Could not put logs, there's an issue with the storage backend : %s", err)
 		return c.String(http.StatusInternalServerError, "could not put logs, there's an issue with the storage backend")
+	}
+	return c.NoContent(http.StatusOK)
+}
+
+func (a *API) GetStackLogsHandler(c echo.Context) error {
+	namespace, stack, run, attempt, unit, err := getStackLogsArgs(c)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+	if attempt == "" {
+		return c.String(http.StatusBadRequest, "missing query parameters")
+	}
+	response := GetLogsResponse{}
+	content, err := a.Storage.GetStackLogs(namespace, stack, run, attempt, unit)
+	if storageerrors.NotFound(err) {
+		return c.String(http.StatusNotFound, "No logs for this attempt")
+	}
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "could not get stack logs, there's an issue with the storage backend")
+	}
+	response.Results = append(response.Results, strings.Split(string(content), "\n")...)
+	return c.JSON(http.StatusOK, &response)
+}
+
+func (a *API) PutStackLogsHandler(c echo.Context) error {
+	namespace, stack, run, attempt, unit, err := getStackLogsArgs(c)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+	if attempt == "" {
+		return c.String(http.StatusBadRequest, "missing query parameters")
+	}
+	content, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.String(http.StatusBadRequest, "could not read request body: "+err.Error())
+	}
+	err = a.Storage.PutStackLogs(namespace, stack, run, attempt, unit, content)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "could not put stack logs, there's an issue with the storage backend: "+err.Error())
 	}
 	return c.NoContent(http.StatusOK)
 }

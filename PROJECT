@@ -25,4 +25,22 @@ resources:
   kind: TerraformLayer
   path: github.com/padok-team/burrito/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: terraform.padok.cloud
+  group: config
+  kind: TerragruntStack
+  path: github.com/padok-team/burrito/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: terraform.padok.cloud
+  group: config
+  kind: TerragruntStackRun
+  path: github.com/padok-team/burrito/api/v1alpha1
+  version: v1alpha1
 version: "3"

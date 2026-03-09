@@ -25,6 +25,7 @@ const (
 	GitBundleFileExtension string = ".gitbundle"
 	RevisionFile           string = "latest"
 	LayersPrefix           string = "layers"
+	StacksPrefix           string = "stacks"
 	RepositoriesPrefix     string = "repositories"
 )
 
@@ -48,6 +49,32 @@ func computePlanKey(namespace string, layer string, run string, attempt string, 
 		key = fmt.Sprintf("%s/%s", prefix, PlanJsonFile)
 	}
 	return key
+}
+
+func computeStackLogsKey(namespace string, stack string, run string, attempt string, unit string) string {
+	if unit == "" {
+		return fmt.Sprintf("%s/%s/%s/%s/%s/%s", StacksPrefix, namespace, stack, run, attempt, LogFile)
+	}
+	return fmt.Sprintf("%s/%s/%s/%s/%s/%s/%s", StacksPrefix, namespace, stack, run, attempt, unit, LogFile)
+}
+
+func computeStackPlanKey(namespace string, stack string, run string, attempt string, unit string, format string) string {
+	prefix := fmt.Sprintf("%s/%s/%s/%s/%s", StacksPrefix, namespace, stack, run, attempt)
+	if unit != "" {
+		prefix = fmt.Sprintf("%s/%s", prefix, unit)
+	}
+	switch format {
+	case "json":
+		return fmt.Sprintf("%s/%s", prefix, PlanJsonFile)
+	case "pretty":
+		return fmt.Sprintf("%s/%s", prefix, PrettyPlanFile)
+	case "short":
+		return fmt.Sprintf("%s/%s", prefix, ShortDiffFile)
+	case "bin":
+		return fmt.Sprintf("%s/%s", prefix, PlanBinFile)
+	default:
+		return fmt.Sprintf("%s/%s", prefix, PlanJsonFile)
+	}
 }
 
 func computeGitBundleKey(namespace string, repository string, branch string, revision string) string {
@@ -136,6 +163,38 @@ func (s *Storage) GetPlan(namespace string, layer string, run string, attempt st
 	} else {
 		return s.EncryptionManager.Decrypt(namespace, data)
 	}
+}
+
+func (s *Storage) GetStackLogs(namespace string, stack string, run string, attempt string, unit string) ([]byte, error) {
+	data, err := s.Backend.Get(computeStackLogsKey(namespace, stack, run, attempt, unit))
+	if err != nil {
+		return nil, err
+	}
+	return s.EncryptionManager.Decrypt(namespace, data)
+}
+
+func (s *Storage) PutStackLogs(namespace string, stack string, run string, attempt string, unit string, logs []byte) error {
+	dataToStore, err := s.EncryptionManager.Encrypt(namespace, logs)
+	if err != nil {
+		return err
+	}
+	return s.Backend.Set(computeStackLogsKey(namespace, stack, run, attempt, unit), dataToStore, 0)
+}
+
+func (s *Storage) GetStackPlan(namespace string, stack string, run string, attempt string, unit string, format string) ([]byte, error) {
+	data, err := s.Backend.Get(computeStackPlanKey(namespace, stack, run, attempt, unit, format))
+	if err != nil {
+		return nil, err
+	}
+	return s.EncryptionManager.Decrypt(namespace, data)
+}
+
+func (s *Storage) PutStackPlan(namespace string, stack string, run string, attempt string, unit string, format string, plan []byte) error {
+	dataToStore, err := s.EncryptionManager.Encrypt(namespace, plan)
+	if err != nil {
+		return err
+	}
+	return s.Backend.Set(computeStackPlanKey(namespace, stack, run, attempt, unit, format), dataToStore, 0)
 }
 
 func (s *Storage) GetLatestPlan(namespace string, layer string, run string, format string) ([]byte, error) {

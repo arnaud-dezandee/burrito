@@ -24,6 +24,10 @@ type Client interface {
 	PutPlan(namespace string, layer string, run string, attempt string, format string, content []byte) error
 	GetLogs(namespace string, layer string, run string, attempt string) ([]string, error)
 	PutLogs(namespace string, layer string, run string, attempt string, content []byte) error
+	GetStackPlan(namespace string, stack string, run string, attempt string, unit string, format string) ([]byte, error)
+	PutStackPlan(namespace string, stack string, run string, attempt string, unit string, format string, content []byte) error
+	GetStackLogs(namespace string, stack string, run string, attempt string, unit string) ([]string, error)
+	PutStackLogs(namespace string, stack string, run string, attempt string, unit string, content []byte) error
 	PutGitBundle(namespace, name, ref, revision string, bundle []byte) error
 	CheckGitBundle(namespace, name, ref, revision string) (bool, error)
 	GetGitBundle(namespace, name, ref, revision string) ([]byte, error)
@@ -194,6 +198,116 @@ func (c *DefaultClient) PutLogs(namespace string, layer string, run string, atte
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("could not put logs, there's an issue with the storage backend")
+	}
+	return nil
+}
+
+func (c *DefaultClient) GetStackPlan(namespace string, stack string, run string, attempt string, unit string, format string) ([]byte, error) {
+	req, err := c.buildRequest("/api/stack/plans", url.Values{
+		"namespace": {namespace},
+		"stack":     {stack},
+		"run":       {run},
+		"attempt":   {attempt},
+		"unit":      {unit},
+		"format":    {format},
+	}, http.MethodGet, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, &storageerrors.StorageError{Err: fmt.Errorf("no plan for this attempt"), Nil: true}
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("could not get stack plan, there's an issue with the storage backend")
+	}
+	return io.ReadAll(resp.Body)
+}
+
+func (c *DefaultClient) PutStackPlan(namespace string, stack string, run string, attempt string, unit string, format string, content []byte) error {
+	req, err := c.buildRequest("/api/stack/plans", url.Values{
+		"namespace": {namespace},
+		"stack":     {stack},
+		"run":       {run},
+		"attempt":   {attempt},
+		"unit":      {unit},
+		"format":    {format},
+	}, http.MethodPut, bytes.NewBuffer(content))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		message, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("could not put stack plan, there's an issue reading the response from datastore: %s", err)
+		}
+		return fmt.Errorf("could not put stack plan, there's an issue with the storage backend: %s", string(message))
+	}
+	return nil
+}
+
+func (c *DefaultClient) GetStackLogs(namespace string, stack string, run string, attempt string, unit string) ([]string, error) {
+	req, err := c.buildRequest("/api/stack/logs", url.Values{
+		"namespace": {namespace},
+		"stack":     {stack},
+		"run":       {run},
+		"attempt":   {attempt},
+		"unit":      {unit},
+	}, http.MethodGet, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, &storageerrors.StorageError{Err: fmt.Errorf("no logs for this attempt"), Nil: true}
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("could not get stack logs, there's an issue with the storage backend")
+	}
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	jresp := api.GetLogsResponse{}
+	if err := json.Unmarshal(b, &jresp); err != nil {
+		return nil, err
+	}
+	return jresp.Results, nil
+}
+
+func (c *DefaultClient) PutStackLogs(namespace string, stack string, run string, attempt string, unit string, content []byte) error {
+	req, err := c.buildRequest("/api/stack/logs", url.Values{
+		"namespace": {namespace},
+		"stack":     {stack},
+		"run":       {run},
+		"attempt":   {attempt},
+		"unit":      {unit},
+	}, http.MethodPut, bytes.NewBuffer(content))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("could not put stack logs, there's an issue with the storage backend")
 	}
 	return nil
 }

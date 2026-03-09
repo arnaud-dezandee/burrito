@@ -5,6 +5,7 @@ import { NavLink } from 'react-router-dom';
 import ProfilePicture from '@/components/misc/ProfilePicture';
 import Burrito from '@/assets/illustrations/Burrito';
 import LayerGroupIcon from '@/assets/icons/LayerGroupIcon';
+import AppsIcon from '@/assets/icons/AppsIcon';
 import CodeBranchIcon from '@/assets/icons/CodeBranchIcon';
 import WindowIcon from '@/assets/icons/WindowIcon';
 
@@ -50,6 +51,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
             to="/layers"
           >
             <LayerGroupIcon />
+          </NavLink>
+          <NavLink
+            className={({ isActive }) =>
+              isActive ? 'fill-inherit' : 'fill-primary-600'
+            }
+            to="/stacks"
+          >
+            <AppsIcon />
           </NavLink>
           <NavLink
             className={({ isActive }) =>

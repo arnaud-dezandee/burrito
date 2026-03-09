@@ -121,6 +121,14 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 			},
 		)).
+		Watches(&configv1alpha1.TerragruntStack{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, obj client.Object) []reconcile.Request {
+				stack := obj.(*configv1alpha1.TerragruntStack)
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{Namespace: stack.Spec.Repository.Namespace, Name: stack.Spec.Repository.Name}},
+				}
+			},
+		)).
 		WithEventFilter(ignorePredicate()).
 		Complete(r)
 }
@@ -130,6 +138,9 @@ func ignorePredicate() predicate.Predicate {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// Ignore updates on TerraformLayer objects, we only watch their creation
 			if _, ok := e.ObjectNew.(*configv1alpha1.TerraformLayer); ok {
+				return false
+			}
+			if _, ok := e.ObjectNew.(*configv1alpha1.TerragruntStack); ok {
 				return false
 			}
 			// Update only if generation or annotations change, filter out anything else.

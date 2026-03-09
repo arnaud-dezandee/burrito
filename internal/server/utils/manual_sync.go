@@ -38,3 +38,17 @@ func GetManualApplyStatus(layer configv1alpha1.TerraformLayer) ManualSyncStatus 
 	}
 	return ManualSyncNone
 }
+
+func GetManualSyncStatusGeneric(annotationsMap map[string]string) ManualSyncStatus {
+	if annotationsMap[annotations.SyncNow] == "true" {
+		return ManualSyncAnnotated
+	}
+	return ManualSyncNone
+}
+
+func GetManualApplyStatusGeneric(annotationsMap map[string]string) ManualSyncStatus {
+	if annotationsMap[annotations.ApplyNow] == "true" {
+		return ManualSyncAnnotated
+	}
+	return ManualSyncNone
+}

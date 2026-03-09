@@ -9,6 +9,7 @@ import ThemeProvider from '@/contexts/ThemeContext';
 
 import Layout from '@/layout/Layout';
 import Layers from '@/pages/Layers';
+import Stacks from '@/pages/Stacks';
 import Pulls from '@/pages/Pulls';
 import Logs from '@/pages/Logs';
 import Login from '@/pages/Login';
@@ -49,6 +50,10 @@ const router = createBrowserRouter([
       {
         path: 'layers',
         element: <Layers />
+      },
+      {
+        path: 'stacks',
+        element: <Stacks />
       },
       {
         path: 'pulls',

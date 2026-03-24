@@ -180,7 +180,7 @@ metadata:
   {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: burrito-server
   labels:
@@ -189,7 +189,7 @@ metadata:
     {{- toYaml .metadata.annotations | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: burrito-server
 subjects:
   - kind: ServiceAccount

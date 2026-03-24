@@ -1,5 +1,5 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: burrito-server
   {{- with mergeOverwrite (deepCopy .Values.global.metadata) .Values.server.metadata }}
@@ -9,95 +9,4 @@ metadata:
     {{- toYaml .annotations | nindent 4}}
   {{- end }}
 rules:
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformlayers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformrepositories
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformlayers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformpullrequests
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformpullrequests/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformpullrequests/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformruns
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformruns/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - config.terraform.padok.cloud
-  resources:
-  - terraformruns/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - list
-  - create
-  - update
-  - watch
-  - get
+{{- include "burrito.serverRules" . | nindent 0 }}
